@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Circle entity-secret recovery file — NEVER commit
+circle-recovery.dat
+circle-recovery*.dat
+recovery_file_*.dat
+*.recovery.dat

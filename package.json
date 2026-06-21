@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "setup:circle": "tsx scripts/setup-circle.ts",
+    "verify:wallet": "tsx scripts/verify-wallet.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.105.0",
@@ -31,6 +33,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
+    "tsx": "4.22.4",
     "typescript": "^5"
   }
 }
