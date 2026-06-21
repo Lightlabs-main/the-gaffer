@@ -1,0 +1,82 @@
+export type Formation = '4-4-2' | '4-3-3' | '3-5-2' | '4-2-3-1' | '5-3-2'
+export type Mentality = 'attacking' | 'balanced' | 'defensive'
+export type PressingStyle = 'high' | 'mid' | 'low'
+
+export interface DecisionOption {
+  id: string
+  label: string
+  description: string
+  totalStreamed: number
+  streamingRate: number
+  lastUpdated: number
+}
+
+export interface DecisionWindow {
+  id: string
+  type:
+    | 'formation'
+    | 'mentality'
+    | 'pressing'
+    | 'substitution'
+    | 'set-piece'
+    | 'crisis'
+    | 'push-or-hold'
+  prompt: string
+  options: DecisionOption[]
+  opensAt: number
+  closesAt: number
+  isOpen: boolean
+  result?: string
+  managerSpeech?: string
+}
+
+export interface MatchEvent {
+  id: string
+  minute: number
+  type:
+    | 'goal'
+    | 'goal-conceded'
+    | 'chance'
+    | 'card'
+    | 'injury'
+    | 'substitution'
+    | 'commentary'
+  text: string
+  isGoal?: boolean
+}
+
+export interface MatchState {
+  id: string
+  creatorWalletId: string
+  homeTeam: {
+    name: string
+    score: number
+    formation: Formation
+    mentality: Mentality
+    pressing: PressingStyle
+  }
+  awayTeam: {
+    name: string
+    score: number
+    formation: Formation
+  }
+  minute: number
+  status: 'pre-match' | 'first-half' | 'half-time' | 'second-half' | 'full-time'
+  events: MatchEvent[]
+  currentDecision?: DecisionWindow
+  totalEarned: number
+}
+
+export interface UserWallet {
+  walletId: string
+  address: string
+  balance: number
+}
+
+export interface Session {
+  id: string
+  matchState: MatchState
+  participants: number
+  createdAt: number
+  sseClients: Set<ReadableStreamDefaultController>
+}
