@@ -9,7 +9,8 @@
     "lint": "eslint",
     "setup:circle": "tsx scripts/setup-circle.ts",
     "verify:wallet": "tsx scripts/verify-wallet.ts",
-    "test:decision-engine": "tsx scripts/test-decision-engine.ts"
+    "test:decision-engine": "tsx scripts/test-decision-engine.ts",
+    "test:phase5": "tsx scripts/test-phase5.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.105.0",

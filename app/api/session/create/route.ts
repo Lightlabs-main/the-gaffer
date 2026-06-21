@@ -47,6 +47,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     const matchState: MatchState = {
       id: sessionId,
       creatorWalletId: walletId,
+      creatorAddress: address,
       homeTeam: {
         name: homeName,
         score: 0,

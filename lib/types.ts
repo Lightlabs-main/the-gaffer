@@ -48,6 +48,7 @@ export interface MatchEvent {
 export interface MatchState {
   id: string
   creatorWalletId: string
+  creatorAddress: string
   homeTeam: {
     name: string
     score: number
