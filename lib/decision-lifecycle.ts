@@ -15,9 +15,12 @@
  * Tap history lives in a side-store keyed by sessionId (out-of-band from
  * the shared types so we don't have to mutate the spec's interfaces).
  */
-import type { Session, DecisionWindow } from './types'
+import { randomUUID } from 'node:crypto'
+import type { Session, DecisionWindow, MatchEvent } from './types'
 import { broadcast } from './sse'
 import { decide, type EngineTap, type EngineResult } from './decision-engine'
+import { produceManagerVerdict } from './manager'
+import { resolveTactic } from './tactic-mapping'
 
 interface WindowState {
   windowId: string
@@ -132,12 +135,91 @@ export function closeDecisionWindow(session: Session): {
   })
   decision.isOpen = false
   decision.result = engine.winnerLabel
-  // managerSpeech stays unset — Phase 6 (AI Manager) populates it.
   broadcast(session, {
     kind: 'decision-closed',
     window: decision,
     engine,
     serverTime: Date.now(),
   })
+  // Fire the AI Manager asynchronously. We don't await — the
+  // decision-closed broadcast went out instantly; the manager's speech
+  // arrives shortly after as a separate `manager-spoke` SSE event, and
+  // the deterministic tactic mutation is applied at the same time.
+  void runManagerForWindow(session, decision, engine)
   return { alreadyClosed: false, window: decision, engine }
+}
+
+/**
+ * Phase 6: ask Claude for the manager speech, apply the deterministic
+ * tactic change to MatchState, broadcast `manager-spoke`. Runs after the
+ * `decision-closed` broadcast has already fired.
+ *
+ * Failure mode: if Claude errors we broadcast a `manager-error` event with
+ * the error message so the UI can show "the manager fell silent" without
+ * the build pretending success. No fake speeches.
+ */
+async function runManagerForWindow(
+  session: Session,
+  decision: DecisionWindow,
+  engine: EngineResult,
+): Promise<void> {
+  try {
+    const verdict = await produceManagerVerdict({
+      matchState: session.matchState,
+      decision,
+      engine,
+    })
+    decision.managerSpeech = verdict.speech
+
+    // Apply the deterministic tactic change.
+    const tactic = resolveTactic(decision.type, engine.winnerLabel)
+    let appliedTactic:
+      | { kind: 'state'; field: string; value: string; previous: string }
+      | { kind: 'event'; eventType: string; text: string }
+      | { kind: 'noop'; reason: string }
+    if (tactic.kind === 'state') {
+      const previous = session.matchState.homeTeam[tactic.field] as string
+      // The tactic types narrow field+value enough that this assignment is
+      // sound; we cast in one place to avoid 12 lines of switch.
+      ;(session.matchState.homeTeam as Record<string, unknown>)[tactic.field] =
+        tactic.value
+      appliedTactic = {
+        kind: 'state',
+        field: tactic.field,
+        value: tactic.value,
+        previous,
+      }
+    } else if (tactic.kind === 'event') {
+      const event: MatchEvent = {
+        id: randomUUID(),
+        minute: session.matchState.minute,
+        type: tactic.eventType,
+        text: tactic.text,
+      }
+      session.matchState.events.push(event)
+      appliedTactic = { kind: 'event', eventType: tactic.eventType, text: tactic.text }
+    } else {
+      appliedTactic = { kind: 'noop', reason: tactic.reason }
+    }
+
+    broadcast(session, {
+      kind: 'manager-spoke',
+      windowId: decision.id,
+      speech: verdict.speech,
+      model: verdict.model,
+      latencyMs: verdict.latencyMs,
+      requestId: verdict.requestId,
+      tactic: appliedTactic,
+      serverTime: Date.now(),
+    })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[manager] failed for window', decision.id, message)
+    broadcast(session, {
+      kind: 'manager-error',
+      windowId: decision.id,
+      error: message,
+      serverTime: Date.now(),
+    })
+  }
 }
