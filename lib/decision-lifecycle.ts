@@ -91,6 +91,7 @@ export function recordTap(session: Session, input: TapInput): {
   state.taps.push({ optionId: input.optionId, amount: input.amount, ts: now })
 
   option.totalStreamed += input.amount
+  session.matchState.totalEarned += input.amount
   // streamingRate: USDC per second, smoothed over the most recent 2s of taps
   const recentCutoff = now - 2_000
   const recentForOption = state.taps.filter(
