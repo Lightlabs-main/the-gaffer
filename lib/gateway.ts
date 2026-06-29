@@ -21,8 +21,9 @@
  *    "this is the surface area" review tractable for the non-coder owner.
  */
 import { BatchFacilitatorClient } from '@circle-fin/x402-batching/server'
-import type { Address } from 'viem'
-import { getAddress, parseUnits, formatUnits } from 'viem'
+import { randomBytes } from 'node:crypto'
+import type { Address, Hex } from 'viem'
+import { getAddress, parseUnits, formatUnits, maxUint256, pad } from 'viem'
 import { getCircleClient } from './circle'
 import { ARC_TESTNET_USDC_ADDRESS, publicClient, ARC_TESTNET_CHAIN_ID } from './chain'
 
@@ -32,6 +33,7 @@ import { ARC_TESTNET_USDC_ADDRESS, publicClient, ARC_TESTNET_CHAIN_ID } from './
  * confirmed 2026-06-21).
  */
 export const TESTNET_GATEWAY_WALLET: Address = '0x0077777d7EBA4688BDeF3E311b846F25870A19B9'
+export const TESTNET_GATEWAY_MINTER: Address = '0x0022222ABE238Cc2C7Bb1f21003F0a260052475B'
 
 /**
  * EIP-712 domain identifiers that BatchEvmScheme uses when signing
@@ -50,6 +52,8 @@ export const ARC_TESTNET_NETWORK = `eip155:${ARC_TESTNET_CHAIN_ID}` // 'eip155:5
  * testnet host or settlement will silently target the wrong environment.
  */
 export const GATEWAY_TESTNET_URL = 'https://gateway-api-testnet.circle.com'
+export const GATEWAY_TESTNET_API_V1 = `${GATEWAY_TESTNET_URL}/v1`
+export const ARC_TESTNET_GATEWAY_DOMAIN = 26
 
 let _facilitator: BatchFacilitatorClient | null = null
 
@@ -71,6 +75,70 @@ export const GATEWAY_WALLET_DEPOSIT_FOR_SIGNATURE =
  * Standard ERC-20 approve, against the USDC contract.
  */
 export const USDC_APPROVE_SIGNATURE = 'approve(address,uint256)'
+export const GATEWAY_MINTER_MINT_SIGNATURE = 'gatewayMint(bytes,bytes)'
+
+const BURN_INTENT_DOMAIN = {
+  name: 'GatewayWallet',
+  version: '1',
+} as const
+
+const BURN_INTENT_TYPES = {
+  EIP712Domain: [
+    { name: 'name', type: 'string' },
+    { name: 'version', type: 'string' },
+  ],
+  TransferSpec: [
+    { name: 'version', type: 'uint32' },
+    { name: 'sourceDomain', type: 'uint32' },
+    { name: 'destinationDomain', type: 'uint32' },
+    { name: 'sourceContract', type: 'bytes32' },
+    { name: 'destinationContract', type: 'bytes32' },
+    { name: 'sourceToken', type: 'bytes32' },
+    { name: 'destinationToken', type: 'bytes32' },
+    { name: 'sourceDepositor', type: 'bytes32' },
+    { name: 'destinationRecipient', type: 'bytes32' },
+    { name: 'sourceSigner', type: 'bytes32' },
+    { name: 'destinationCaller', type: 'bytes32' },
+    { name: 'value', type: 'uint256' },
+    { name: 'salt', type: 'bytes32' },
+    { name: 'hookData', type: 'bytes' },
+  ],
+  BurnIntent: [
+    { name: 'maxBlockHeight', type: 'uint256' },
+    { name: 'maxFee', type: 'uint256' },
+    { name: 'spec', type: 'TransferSpec' },
+  ],
+} as const
+
+interface GatewayBurnIntent {
+  maxBlockHeight: bigint
+  maxFee: bigint
+  spec: {
+    version: number
+    sourceDomain: number
+    destinationDomain: number
+    sourceContract: Hex
+    destinationContract: Hex
+    sourceToken: Hex
+    destinationToken: Hex
+    sourceDepositor: Hex
+    destinationRecipient: Hex
+    sourceSigner: Hex
+    destinationCaller: Hex
+    value: bigint
+    salt: Hex
+    hookData: Hex
+  }
+}
+
+interface GatewayTransferResponse {
+  success?: boolean
+  error?: string
+  message?: string
+  attestation?: Hex
+  signature?: Hex
+  [key: string]: unknown
+}
 
 /**
  * Approve the GatewayWallet contract to spend `amountUsdc` of the
@@ -209,6 +277,174 @@ export async function readGatewayAvailableBalance(
     args: [ARC_TESTNET_USDC_ADDRESS, depositor],
   })
   return { raw, formatted: formatUnits(raw, 6) }
+}
+
+/**
+ * Withdraw creator earnings from Circle Gateway back onto Arc Testnet by
+ * recreating the SDK's normal burn-intent flow with Circle DCW signing.
+ *
+ * The public GatewayClient.withdraw() helper requires an in-process private
+ * key. The Gaffer creator wallet is developer-controlled, so the signing step
+ * must go through Circle's `signTypedData`; the final `gatewayMint` transaction
+ * is also submitted by Circle's contract-execution API from the creator wallet.
+ */
+export async function withdrawGatewayAvailableBalance(opts: {
+  creatorWalletId: string
+  creatorAddress: Address
+  recipientAddress: Address
+  amountUsdc: string
+  maxFeeUsdc?: string
+}): Promise<{
+  amountAtomic: string
+  formattedAmount: string
+  recipientAddress: Address
+  burnIntent: GatewayBurnIntent
+  burnIntentSignature: Hex
+  attestation: Hex
+  gatewaySignature: Hex
+  mintTransactionId: string
+}> {
+  const client = getCircleClient()
+  const creator = getAddress(opts.creatorAddress) as Address
+  const recipient = getAddress(opts.recipientAddress) as Address
+  const amountAtomic = parseUnits(opts.amountUsdc, 6)
+  const maxFeeAtomic = parseUnits(opts.maxFeeUsdc ?? '0', 6)
+
+  if (amountAtomic <= 0n) {
+    throw new Error('amountUsdc must be greater than zero')
+  }
+
+  const burnIntent = buildGatewayBurnIntent({
+    creatorAddress: creator,
+    recipientAddress: recipient,
+    amountAtomic,
+    maxFeeAtomic,
+  })
+  const burnIntentSignature = await signGatewayBurnIntent({
+    walletId: opts.creatorWalletId,
+    burnIntent,
+  })
+  const transfer = await submitGatewayTransfer({
+    burnIntent,
+    signature: burnIntentSignature,
+  })
+
+  const mintRes = await client.createContractExecutionTransaction({
+    walletId: opts.creatorWalletId,
+    contractAddress: TESTNET_GATEWAY_MINTER,
+    abiFunctionSignature: GATEWAY_MINTER_MINT_SIGNATURE,
+    abiParameters: [transfer.attestation, transfer.signature],
+    fee: { type: 'level', config: { feeLevel: 'MEDIUM' } },
+  } as unknown as Parameters<typeof client.createContractExecutionTransaction>[0])
+  const mintTransactionId = mintRes.data?.id
+  if (!mintTransactionId) {
+    throw new Error('Circle did not return a gatewayMint transaction id')
+  }
+
+  return {
+    amountAtomic: amountAtomic.toString(),
+    formattedAmount: formatUnits(amountAtomic, 6),
+    recipientAddress: recipient,
+    burnIntent,
+    burnIntentSignature,
+    attestation: transfer.attestation,
+    gatewaySignature: transfer.signature,
+    mintTransactionId,
+  }
+}
+
+function buildGatewayBurnIntent(opts: {
+  creatorAddress: Address
+  recipientAddress: Address
+  amountAtomic: bigint
+  maxFeeAtomic: bigint
+}): GatewayBurnIntent {
+  const creator = getAddress(opts.creatorAddress) as Address
+  const recipient = getAddress(opts.recipientAddress) as Address
+  return {
+    maxBlockHeight: maxUint256,
+    maxFee: opts.maxFeeAtomic,
+    spec: {
+      version: 1,
+      sourceDomain: ARC_TESTNET_GATEWAY_DOMAIN,
+      destinationDomain: ARC_TESTNET_GATEWAY_DOMAIN,
+      sourceContract: addressToBytes32(TESTNET_GATEWAY_WALLET),
+      destinationContract: addressToBytes32(TESTNET_GATEWAY_MINTER),
+      sourceToken: addressToBytes32(ARC_TESTNET_USDC_ADDRESS),
+      destinationToken: addressToBytes32(ARC_TESTNET_USDC_ADDRESS),
+      sourceDepositor: addressToBytes32(creator),
+      destinationRecipient: addressToBytes32(recipient),
+      sourceSigner: addressToBytes32(creator),
+      destinationCaller: addressToBytes32('0x0000000000000000000000000000000000000000'),
+      value: opts.amountAtomic,
+      salt: `0x${randomBytes(32).toString('hex')}`,
+      hookData: '0x',
+    },
+  }
+}
+
+async function signGatewayBurnIntent(opts: {
+  walletId: string
+  burnIntent: GatewayBurnIntent
+}): Promise<Hex> {
+  const client = getCircleClient()
+  const res = await client.signTypedData({
+    walletId: opts.walletId,
+    data: JSON.stringify(
+      {
+        types: BURN_INTENT_TYPES,
+        domain: BURN_INTENT_DOMAIN,
+        primaryType: 'BurnIntent',
+        message: opts.burnIntent,
+      },
+      jsonSafe,
+    ),
+  })
+  const signature = res.data?.signature
+  if (!signature) {
+    throw new Error('Circle signTypedData returned no Gateway burn signature')
+  }
+  return signature as Hex
+}
+
+async function submitGatewayTransfer(opts: {
+  burnIntent: GatewayBurnIntent
+  signature: Hex
+}): Promise<{ attestation: Hex; signature: Hex }> {
+  const response = await fetch(`${GATEWAY_TESTNET_API_V1}/transfer`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify([opts], jsonSafe),
+  })
+  const result = (await response.json().catch(() => ({}))) as GatewayTransferResponse
+
+  if (
+    !response.ok ||
+    result.success === false ||
+    result.error ||
+    !result.attestation ||
+    !result.signature
+  ) {
+    throw new Error(
+      `Gateway transfer failed (${response.status}): ${
+        result.message ?? result.error ?? JSON.stringify(result)
+      }`,
+    )
+  }
+
+  return {
+    attestation: result.attestation,
+    signature: result.signature,
+  }
+}
+
+function addressToBytes32(addr: Address): Hex {
+  return pad(getAddress(addr).toLowerCase() as Hex, { size: 32 })
+}
+
+function jsonSafe(_key: string, value: unknown): unknown {
+  if (typeof value === 'bigint') return value.toString()
+  return value
 }
 
 /**

@@ -8,11 +8,11 @@
  *
  *   1. Creates a fresh Circle developer-controlled wallet on Arc Testnet.
  *   2. Sends `treasuryUsdc` USDC from the project treasury to that wallet
- *      (default 0.05).
+ *      (default 1.0000).
  *   3. Waits for the on-chain balance to land (poll Arc Testnet USDC contract).
  *   4. Approves the Circle GatewayWallet contract to spend `gatewayUsdc`
  *      USDC of that wallet, then calls `depositFor(usdc, depositor, amount)`
- *      against GatewayWallet (default 0.03 USDC).
+ *      against GatewayWallet (default 0.05 USDC).
  *   5. Records the wallet in the per-session participant registry so
  *      /api/decision/stream can look it up by walletId.
  *
@@ -20,8 +20,7 @@
  * the caller can prove every step happened against real chain state.
  *
  * Cost note: Arc Testnet charges gas in USDC, so the treasury seed has to
- * cover both the deposit amount and the gas for approve+deposit. The demo
- * seed is intentionally small so the testnet treasury survives repeated joins.
+ * cover both the deposit amount and the gas for approve+deposit.
  */
 import { NextResponse } from 'next/server'
 import type { Address } from 'viem'
@@ -38,12 +37,12 @@ export const dynamic = 'force-dynamic'
 
 interface Body {
   sessionId?: string
-  treasuryUsdc?: string // decimal e.g. "0.05"
-  gatewayUsdc?: string // decimal e.g. "0.03"
+  treasuryUsdc?: string // decimal e.g. "1"
+  gatewayUsdc?: string // decimal e.g. "0.05"
 }
 
-const PARTICIPANT_SEED_USDC = '0.05'
-const PARTICIPANT_GATEWAY_USDC = '0.03'
+const PARTICIPANT_SEED_USDC = '1'
+const PARTICIPANT_GATEWAY_USDC = '0.05'
 
 export async function POST(req: Request): Promise<NextResponse> {
   let stage = 'parse'

@@ -53,7 +53,7 @@ export const env = {
   treasuryWalletId: () => need('TREASURY_WALLET_ID'),
   treasuryAddress: () => need('TREASURY_ADDRESS'),
   anthropicKey: () => need('ANTHROPIC_API_KEY'),
-  anthropicModel: () => optional('ANTHROPIC_MODEL') ?? 'claude-opus-4-8',
+  anthropicModel: () => 'claude-sonnet-4-6',
   appUrl: () => optional('NEXT_PUBLIC_APP_URL') ?? 'http://localhost:3000',
 
   // Non-throwing accessors for setup scripts

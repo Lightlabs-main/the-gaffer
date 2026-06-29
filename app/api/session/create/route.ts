@@ -23,7 +23,7 @@ import { getExperienceFormat, type ExperienceType } from '@/lib/experience-forma
 
 export const dynamic = 'force-dynamic'
 
-const CREATOR_SEED_USDC = '0.05'
+const CREATOR_SEED_USDC = '1'
 
 interface CreateBody {
   awayTeamName?: string

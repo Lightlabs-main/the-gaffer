@@ -214,11 +214,12 @@ CIRCLE_API_KEY=TEST_API_KEY:your-circle-api-key
 ENTITY_SECRET=your-entity-secret
 CIRCLE_WALLET_SET_ID=your-wallet-set-id
 ANTHROPIC_API_KEY=sk-ant-your-anthropic-key
-ANTHROPIC_MODEL=claude-opus-4-8
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 TREASURY_WALLET_ID=your-treasury-wallet-id
 TREASURY_ADDRESS=0xyour-treasury-address
 ```
+
+The app pins Claude to `claude-sonnet-4-6` in code for hackathon consistency.
 
 ### Setup
 
@@ -254,6 +255,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run verify:wallet` | Verify wallet endpoints are working |
 | `npm run test:decision-engine` | Run confidence-level test scenarios |
 | `npm run test:phase5` | Test x402 payment pipeline |
+| `npm run test:phase6` | Run live Claude manager/simulator proof |
 
 ---
 

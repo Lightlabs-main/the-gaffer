@@ -14,7 +14,7 @@ import { createUserWallet, transferUsdcFromTreasury, waitForUsdcBalance } from '
 // Force dynamic — this endpoint mutates external state.
 export const dynamic = 'force-dynamic'
 
-const LOGIN_SEED_USDC = '0.05'
+const LOGIN_SEED_USDC = '1'
 
 function detailErr(err: unknown): { stage: string; message: string; details: unknown } {
   // Circle SDK errors expose: message, code, errors[], status, response.data.

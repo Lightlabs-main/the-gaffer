@@ -1,5 +1,5 @@
 /**
- * Phase 5 end-to-end proof — REAL Circle Gateway settlement, no mocks.
+ * Payment end-to-end proof — REAL x402 + Circle Gateway settlement, no mocks.
  *
  * What this script does, in order:
  *   1. Boots a fresh match session (POST /api/session/create). Records the
@@ -7,7 +7,7 @@
  *   2. Reads the creator's USDC balance directly from the Arc Testnet USDC
  *      contract — the BEFORE number.
  *   3. Creates one participant wallet (POST /api/wallet/participant). This
- *      transfers a small demo USDC seed from the treasury to the new wallet,
+ *      transfers a real USDC seed from the treasury to the new wallet,
  *      approves the Circle GatewayWallet contract, and deposits part of it
  *      into Gateway.
  *      Returns the on-chain balance and the Gateway-available balance.
@@ -19,13 +19,15 @@
  *      Gateway testnet facilitator. We collect each `settle.transaction`.
  *   6. Closes the window (POST /api/decision/close) so the engine writes a
  *      verdict.
- *   7. Reads the creator's USDC balance directly from the contract again —
- *      the AFTER number — and asserts it grew by `N * amountUsdc`.
+ *   7. Reads the creator's wallet and Gateway-available balances directly
+ *      from Arc Testnet contracts. Gateway batching credits the creator's
+ *      Gateway-available balance first; `/api/wallet/withdraw` moves those
+ *      earnings to a normal wallet balance.
  *
  * Expected PASS evidence:
  *   - Step 5 prints N distinct `settle.transaction` references from Circle.
- *   - Step 7 prints AFTER - BEFORE == N * 0.0001 USDC (or very close, since
- *     this is the only money path into the creator's wallet during the test).
+ *   - Step 7 prints the creator's Gateway-available delta once the Gateway
+ *     testnet batcher has flushed settlement on-chain.
  *
  * Run against a live dev server:
  *   npm run dev          # in one terminal
@@ -33,6 +35,7 @@
  */
 import { readUsdcBalance } from '../lib/chain'
 import { readGatewayAvailableBalance } from '../lib/gateway'
+import { decodePaymentResponseHeader } from '@x402/core/http'
 import type { Address } from 'viem'
 
 const BASE = process.env.GAFFER_BASE_URL ?? 'http://localhost:3000'
@@ -42,6 +45,14 @@ const TAP_AMOUNT_USDC = '0.0001'
 type Json = Record<string, unknown>
 
 async function api(path: string, init?: RequestInit): Promise<Json> {
+  const { json } = await apiWithHeaders(path, init)
+  return json
+}
+
+async function apiWithHeaders(
+  path: string,
+  init?: RequestInit,
+): Promise<{ json: Json; headers: Headers; status: number }> {
   const url = `${BASE}${path}`
   const res = await fetch(url, {
     method: init?.method ?? 'POST',
@@ -60,7 +71,7 @@ async function api(path: string, init?: RequestInit): Promise<Json> {
       `${path} failed (${res.status}):\n${JSON.stringify(parsed, null, 2)}`,
     )
   }
-  return parsed as Json
+  return { json: parsed as Json, headers: res.headers, status: res.status }
 }
 
 function line(label: string, value: unknown): void {
@@ -68,7 +79,7 @@ function line(label: string, value: unknown): void {
 }
 
 async function main(): Promise<void> {
-  console.log('━━━━━━ Phase 5 self-audit ━━━━━━')
+  console.log('━━━━━━ Payment self-audit ━━━━━━')
   console.log(`base: ${BASE}`)
 
   console.log('\n[1/7] create session')
@@ -97,8 +108,8 @@ async function main(): Promise<void> {
   const part = (await api('/api/wallet/participant', {
     body: JSON.stringify({
       sessionId,
-      treasuryUsdc: '0.05',
-      gatewayUsdc: '0.03',
+      treasuryUsdc: '1',
+      gatewayUsdc: '0.05',
     }),
   })) as {
     participant: {
@@ -134,23 +145,30 @@ async function main(): Promise<void> {
   console.log(`\n[5/7] stream ${TAP_COUNT} taps for option A via Circle Gateway`)
   const settlements: string[] = []
   for (let i = 1; i <= TAP_COUNT; i++) {
-    const r = (await api('/api/decision/stream', {
+    const { json: r, headers } = (await apiWithHeaders('/api/decision/stream', {
       body: JSON.stringify({
         sessionId,
         optionId: optionA.id,
         participantWalletId,
         amountUsdc: TAP_AMOUNT_USDC,
       }),
-    })) as {
-      settle: { success: boolean; transaction: string; network: string; payer: string }
-      tap: { accepted: boolean; totalForOption: number }
+    })) as unknown as {
+      json: {
+        x402: { verified: boolean; settlement: string }
+      }
+      headers: Headers
     }
-    const tx = r.settle.transaction
+    const paymentResponse = headers.get('PAYMENT-RESPONSE')
+    if (!paymentResponse) {
+      throw new Error('stream response did not include PAYMENT-RESPONSE header')
+    }
+    const settle = decodePaymentResponseHeader(paymentResponse)
+    const tx = settle.transaction
     settlements.push(tx)
     line(`tap ${i} settle.transaction`, tx)
-    line(`tap ${i} settle.success`, String(r.settle.success))
-    line(`tap ${i} settle.network`, r.settle.network)
-    line(`tap ${i} totalForOption`, r.tap.totalForOption)
+    line(`tap ${i} settle.success`, String(settle.success))
+    line(`tap ${i} settle.network`, settle.network)
+    line(`tap ${i} x402.verified`, String(r.x402.verified))
   }
 
   console.log('\n[6/7] close window (engine verdict)')
@@ -203,7 +221,7 @@ async function main(): Promise<void> {
   line('actual gateway delta', actualDelta.toString())
 
   console.log('\n━━━━━━ verdict ━━━━━━')
-  // PASS criteria for Phase 5 code correctness:
+  // PASS criteria for payment code correctness:
   //   - All taps got a Circle settle response with success: true (proven by
   //     reaching step [5/7] without exception — the script throws on !ok).
   //   - All Circle settlement UUIDs are queryable on Circle's public API and

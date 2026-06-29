@@ -34,6 +34,7 @@ export default function DecisionWindow({
 }: Props) {
   const [secondsLeft, setSecondsLeft] = useState(0)
   const [streamingOptionId, setStreamingOptionId] = useState<string | null>(null)
+  const [streamError, setStreamError] = useState<string | null>(null)
   const streamIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Countdown timer
@@ -63,10 +64,16 @@ export default function DecisionWindow({
     (optionId: string) => {
       if (!participantWalletId || !walletReady || !decision?.isOpen) return
       stopStreaming()
+      setStreamError(null)
       setStreamingOptionId(optionId)
 
       // Send a tap immediately
-      void sendTap(sessionId, optionId, participantWalletId)
+      void sendTap(sessionId, optionId, participantWalletId).then((error) => {
+        if (error) {
+          setStreamError(error)
+          stopStreaming()
+        }
+      })
 
       // Then every 500ms while holding
       streamIntervalRef.current = setInterval(() => {
@@ -74,7 +81,12 @@ export default function DecisionWindow({
           stopStreaming()
           return
         }
-        void sendTap(sessionId, optionId, participantWalletId)
+        void sendTap(sessionId, optionId, participantWalletId).then((error) => {
+          if (error) {
+            setStreamError(error)
+            stopStreaming()
+          }
+        })
       }, 500)
     },
     [participantWalletId, walletReady, decision, sessionId, stopStreaming],
@@ -133,6 +145,11 @@ export default function DecisionWindow({
           Setting up your wallet - streaming will be enabled shortly...
         </div>
       )}
+      {streamError && (
+        <div className="mt-2 rounded-lg border border-red-500/30 bg-red-950/40 px-3 py-2 text-xs text-red-200">
+          {streamError}
+        </div>
+      )}
     </div>
   )
 }
@@ -141,14 +158,19 @@ async function sendTap(
   sessionId: string,
   optionId: string,
   participantWalletId: string,
-): Promise<void> {
+): Promise<string | null> {
   try {
-    await fetch('/api/decision/stream', {
+    const res = await fetch('/api/decision/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId, optionId, participantWalletId }),
     })
-  } catch {
-    // Silently fail individual taps — the SSE stream shows the real totals
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      return data.error || data.message || `Stream failed (${res.status})`
+    }
+    return null
+  } catch (err: unknown) {
+    return err instanceof Error ? err.message : 'Stream failed'
   }
 }

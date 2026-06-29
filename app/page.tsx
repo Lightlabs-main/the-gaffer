@@ -8,12 +8,12 @@ import AccountPanel from '@/components/AccountPanel'
 import { EXPERIENCE_FORMATS } from '@/lib/experience-formats'
 
 const tickerItems = [
-  "76' Signal resolved - confident",
-  "77' USDC stream - +$42.50",
-  "78' Tactic applied - high press",
-  "79' Chance created - xG 0.34",
-  "80' Stream batch - 142 wallets",
-  "81' Gaffer responded - decisive",
+  'Create a match room',
+  'Share the supporter link',
+  'Supporters get Circle wallets',
+  'USDC streams pick the tactic',
+  'Claude reacts to the money signal',
+  'SSE pushes every live update',
 ]
 
 export default function Home() {
@@ -58,7 +58,7 @@ export default function Home() {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--pitch-green)] opacity-70" />
               <span className="relative inline-flex size-1.5 rounded-full bg-[var(--pitch-green)]" />
             </span>
-            Live on Arc - 7 formats shipping now
+            Real Arc Testnet payments - no demo balances
           </div>
 
           <h1 className="rise-in mt-5 max-w-4xl text-5xl font-semibold leading-[0.95] tracking-tight text-zinc-950 sm:text-7xl lg:text-[88px]">
@@ -66,9 +66,9 @@ export default function Home() {
             the show.
           </h1>
           <p className="rise-in mt-6 max-w-[52ch] text-base leading-relaxed text-zinc-600 sm:text-lg">
-            Football was the wedge. The mechanic is universal: fans stream USDC
-            to steer the decision, an AI agent reads the money signal, the show
-            reacts live, and every call is saved as provenance.
+            Fans stream test USDC to steer the decision, an AI agent reads the
+            money signal, the match reacts live, and every call is saved as
+            provenance.
           </p>
 
           <div className="rise-in mt-9 flex flex-col gap-3 sm:flex-row">
@@ -87,10 +87,10 @@ export default function Home() {
           </div>
 
           <dl className="rise-in mt-14 grid grid-cols-2 gap-x-6 gap-y-6 border-t border-zinc-200/90 pt-8 sm:grid-cols-4">
-            <Stat label="Smallest stream" value="$0.000001" />
-            <Stat label="Settlement" value="<500ms" />
-            <Stat label="Signal types" value="7" />
-            <Stat label="Anti-fake rules" value="Honest" />
+            <Stat label="Per tap" value="$0.0001" />
+            <Stat label="Chain" value="Arc" />
+            <Stat label="Wallets" value="Circle" />
+            <Stat label="Updates" value="SSE" />
           </dl>
         </div>
       </section>
@@ -103,13 +103,13 @@ export default function Home() {
                 <ClubBadge code="CWD" name="The Crowd FC" />
                 <div className="flex flex-col items-center">
                   <span className="font-mono text-xs font-medium text-[var(--accent)]">
-                    78:12
+                    00:00
                   </span>
                   <span className="mt-1 text-4xl font-medium tabular-nums sm:text-5xl">
-                    2<span className="mx-2 text-zinc-600">-</span>1
+                    0<span className="mx-2 text-zinc-600">-</span>0
                   </span>
                   <span className="mt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                    Second half
+                    Pre-match
                   </span>
                 </div>
                 <ClubBadge code="ALG" name="Algorithm Utd" />
@@ -120,27 +120,27 @@ export default function Home() {
                   <div className="flex items-center gap-2">
                     <span className="inline-block size-2 animate-pulse rounded-full bg-red-500" />
                     <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-400">
-                      Decision window open
+                      Decision window ready
                     </span>
                   </div>
-                  <span className="font-mono text-xs text-zinc-500">00:42</span>
+                  <span className="font-mono text-xs text-zinc-500">30s</span>
                 </div>
                 <h2 className="text-lg font-medium sm:text-xl">
-                  How do we close this out?
+                  How should the crowd set up?
                 </h2>
                 <div className="mt-4 space-y-3">
                   <LiveOption
                     title="High press"
                     detail="Force the error high up"
-                    amount="$1,402"
-                    width="58%"
+                    amount="0.0000 USDC"
+                    width="50%"
                     active
                   />
                   <LiveOption
                     title="Park the bus"
                     detail="Defend the lead deeply"
-                    amount="$482"
-                    width="22%"
+                    amount="0.0000 USDC"
+                    width="50%"
                   />
                 </div>
               </div>
@@ -158,8 +158,8 @@ export default function Home() {
                     </span>
                   </div>
                   <p className="mt-1 text-xs leading-relaxed text-zinc-300">
-                    The crowd is leaning into the press. Risky with their pace,
-                    but if we win it high, it is game over.
+                    Once supporters stream USDC, I read the signal and make the
+                    tactical call. Until then, nothing is counted.
                   </p>
                 </div>
               </div>
@@ -170,7 +170,7 @@ export default function Home() {
                     Fan room
                   </p>
                   <p className="truncate font-mono text-xs text-zinc-300">
-                    localhost:3000/session/cwd-7f3a92
+                    Create a room to generate a real session link
                   </p>
                 </div>
                 <Link
@@ -223,7 +223,7 @@ export default function Home() {
               Not just football
             </p>
             <h2 className="mt-4 text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
-              Seven live formats. One steering mechanic.
+              Format templates. One steering mechanic.
             </h2>
             <p className="mt-6 max-w-[52ch] text-zinc-400">
               Gaffer is the front-end spectacle. Underneath it, payment streams
@@ -234,11 +234,11 @@ export default function Home() {
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur">
             <div className="flex items-center justify-between">
               <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                Shipping for July 6
+                Available room formats
               </p>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
                 <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" />
-                All live
+                Real sessions only
               </span>
             </div>
             <ul className="mt-5 divide-y divide-white/5">
@@ -251,7 +251,7 @@ export default function Home() {
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-sm text-zinc-100">{format.label}</span>
                       <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-emerald-400/80">
-                        Live
+                        {format.status === 'live' ? 'Playable' : 'Queued'}
                       </span>
                     </div>
                     <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">

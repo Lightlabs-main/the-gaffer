@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { getAddress, parseUnits, type Address } from 'viem'
-import { readGatewayAvailableBalance } from '@/lib/gateway'
+import {
+  readGatewayAvailableBalance,
+  withdrawGatewayAvailableBalance,
+} from '@/lib/gateway'
 import { getSession } from '@/lib/session-store'
 
 export const dynamic = 'force-dynamic'
@@ -9,6 +12,7 @@ interface Body {
   sessionId?: string
   creatorWalletId?: string
   amountUsdc?: string
+  maxFeeUsdc?: string
   destinationAddress?: string
 }
 
@@ -63,19 +67,30 @@ export async function POST(req: Request): Promise<NextResponse> {
       )
     }
 
-    return NextResponse.json(
-      {
-        error:
-          'Gateway earnings are real and available, but custodial Gateway withdrawal is not wired yet. The public GatewayClient.withdraw() path requires a local private key; this app uses Circle developer-controlled wallets, so the next implementation step is a DCW-signed Gateway burn intent.',
-        sessionId: session.id,
-        creatorAddress: session.matchState.creatorAddress,
-        destinationAddress: destination,
-        requestedAmountUsdc: body.amountUsdc,
-        gatewayAvailable: gatewayBalance.formatted,
-        gatewayAvailableRaw: gatewayBalance.raw.toString(),
+    const withdrawal = await withdrawGatewayAvailableBalance({
+      creatorWalletId: body.creatorWalletId,
+      creatorAddress: session.matchState.creatorAddress as Address,
+      recipientAddress: destination,
+      amountUsdc: body.amountUsdc,
+      maxFeeUsdc: body.maxFeeUsdc,
+    })
+
+    return NextResponse.json({
+      sessionId: session.id,
+      creatorAddress: session.matchState.creatorAddress,
+      destinationAddress: destination,
+      requestedAmountUsdc: body.amountUsdc,
+      amountAtomic: withdrawal.amountAtomic,
+      gatewayAvailableBefore: gatewayBalance.formatted,
+      gatewayAvailableBeforeRaw: gatewayBalance.raw.toString(),
+      transactionId: withdrawal.mintTransactionId,
+      mintTransactionId: withdrawal.mintTransactionId,
+      gateway: {
+        attestation: withdrawal.attestation,
+        signature: withdrawal.gatewaySignature,
+        burnIntentSignature: withdrawal.burnIntentSignature,
       },
-      { status: 501 },
-    )
+    })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[wallet/withdraw] failed:', message)

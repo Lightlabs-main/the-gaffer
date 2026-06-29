@@ -101,7 +101,7 @@ function engine(confidence: EngineResult['confidence']): EngineResult {
 }
 
 async function main() {
-  console.log('Phase 6 Opus proof: real Claude manager + simulator calls')
+  console.log('AI proof: real Claude manager + simulator calls')
   for (const confidence of ['decisive', 'narrow', 'divided', 'reversal'] as const) {
     const verdict = await produceManagerVerdict({
       matchState: baseMatch,
