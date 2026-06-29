@@ -53,6 +53,7 @@ export const env = {
   treasuryWalletId: () => need('TREASURY_WALLET_ID'),
   treasuryAddress: () => need('TREASURY_ADDRESS'),
   anthropicKey: () => need('ANTHROPIC_API_KEY'),
+  anthropicModel: () => optional('ANTHROPIC_MODEL') ?? 'claude-opus-4-8',
   appUrl: () => optional('NEXT_PUBLIC_APP_URL') ?? 'http://localhost:3000',
 
   // Non-throwing accessors for setup scripts
@@ -61,4 +62,5 @@ export const env = {
   optionalWalletSetId: () => optional('CIRCLE_WALLET_SET_ID'),
   optionalTreasuryWalletId: () => optional('TREASURY_WALLET_ID'),
   optionalTreasuryAddress: () => optional('TREASURY_ADDRESS'),
+  optionalAnthropicModel: () => optional('ANTHROPIC_MODEL'),
 }

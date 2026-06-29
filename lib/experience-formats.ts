@@ -1,0 +1,95 @@
+export const EXPERIENCE_FORMATS = [
+  {
+    id: 'football-simulation',
+    label: 'Football simulation stream',
+    shortLabel: 'Football',
+    summary: 'Fans manage a live simulated club through tactical USDC streams.',
+    creatorLabel: 'Club name',
+    opponentLabel: 'Opponent',
+    defaultHome: 'The Crowd FC',
+    defaultAway: 'Algorithm United',
+    accent: 'tactics',
+    status: 'live',
+  },
+  {
+    id: 'fantasy-watch-party',
+    label: 'Fantasy sports watch party',
+    shortLabel: 'Fantasy',
+    summary: 'A creator hosts a fantasy slate while fans stream toward picks, swaps, and risk calls.',
+    creatorLabel: 'Squad name',
+    opponentLabel: 'Slate / league',
+    defaultHome: 'Signal XI',
+    defaultAway: 'Weekend Slate',
+    accent: 'lineups',
+    status: 'next',
+  },
+  {
+    id: 'esports-coaching',
+    label: 'Esports coaching stream',
+    shortLabel: 'Esports',
+    summary: 'Viewers steer drafts, rotations, economy choices, and macro calls with micropayments.',
+    creatorLabel: 'Team name',
+    opponentLabel: 'Rival / map',
+    defaultHome: 'Crowd Stack',
+    defaultAway: 'Ranked Finals',
+    accent: 'macro',
+    status: 'next',
+  },
+  {
+    id: 'ai-reality-show',
+    label: 'AI-generated reality show',
+    shortLabel: 'Reality',
+    summary: 'Fans fund drama beats, alliances, twists, and eliminations in a live AI cast.',
+    creatorLabel: 'Show name',
+    opponentLabel: 'Season theme',
+    defaultHome: 'House of Signals',
+    defaultAway: 'Season One',
+    accent: 'twists',
+    status: 'next',
+  },
+  {
+    id: 'live-storytelling-game',
+    label: 'Live storytelling game',
+    shortLabel: 'Story',
+    summary: 'A crowd-paid narrative where supporters steer quests, factions, risks, and endings.',
+    creatorLabel: 'World name',
+    opponentLabel: 'Conflict',
+    defaultHome: 'The Signal Realm',
+    defaultAway: 'The Black Gate',
+    accent: 'story',
+    status: 'next',
+  },
+  {
+    id: 'creator-competition',
+    label: 'Creator competition funded by fans',
+    shortLabel: 'Creator Cup',
+    summary: 'Supporters fund challenges, boosts, penalties, and prize moments for live creator contests.',
+    creatorLabel: 'Competition name',
+    opponentLabel: 'Challenge theme',
+    defaultHome: 'Creator Cup',
+    defaultAway: 'Fan-Funded Finals',
+    accent: 'prizes',
+    status: 'next',
+  },
+  {
+    id: 'twitch-plays-micropayments',
+    label: 'Twitch-Plays with real micropayments',
+    shortLabel: 'Twitch-Plays',
+    summary: 'Any stream becomes steerable: fans pay toward options, AI executes, provenance proves it.',
+    creatorLabel: 'Experience name',
+    opponentLabel: 'Scenario',
+    defaultHome: 'The Crowd Controls',
+    defaultAway: 'Live Scenario',
+    accent: 'control',
+    status: 'next',
+  },
+] as const
+
+export type ExperienceType = (typeof EXPERIENCE_FORMATS)[number]['id']
+
+export function getExperienceFormat(id?: string) {
+  return (
+    EXPERIENCE_FORMATS.find((format) => format.id === id) ??
+    EXPERIENCE_FORMATS[0]
+  )
+}

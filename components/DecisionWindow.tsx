@@ -39,8 +39,8 @@ export default function DecisionWindow({
   // Countdown timer
   useEffect(() => {
     if (!decision || !decision.isOpen) {
-      setSecondsLeft(0)
-      return
+      const clearTimer = window.setTimeout(() => setSecondsLeft(0), 0)
+      return () => window.clearTimeout(clearTimer)
     }
     const update = () => {
       const left = Math.max(0, Math.ceil((decision.closesAt - Date.now()) / 1000))
@@ -82,7 +82,10 @@ export default function DecisionWindow({
 
   // Clean up on unmount or decision close
   useEffect(() => {
-    if (!decision?.isOpen) stopStreaming()
+    if (!decision?.isOpen) {
+      const timer = window.setTimeout(stopStreaming, 0)
+      return () => window.clearTimeout(timer)
+    }
     return stopStreaming
   }, [decision?.isOpen, stopStreaming])
 
@@ -92,23 +95,23 @@ export default function DecisionWindow({
 
   if (!decision.isOpen) {
     return (
-      <div className="w-full rounded-lg border border-zinc-700/50 p-4 text-center text-sm text-zinc-500">
-        Window closed — waiting for the gaffer...
+      <div className="match-panel w-full p-4 text-center text-sm text-zinc-500">
+        Window closed - waiting for the gaffer...
       </div>
     )
   }
 
   return (
-    <div className="w-full rounded-lg border border-[var(--pitch-dim)]/40 p-4">
+    <div className="live-card w-full p-5">
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-xs font-bold uppercase tracking-wider text-[var(--pitch-dim)]">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-400">
           {decision.type}
         </span>
-        <span className="font-mono text-sm font-bold text-[var(--pitch-green)]">
+        <span className="font-mono text-sm font-semibold text-[var(--accent)]">
           {secondsLeft}s
         </span>
       </div>
-      <div className="mb-4 text-sm font-bold">{decision.prompt}</div>
+      <div className="mb-4 text-lg font-semibold text-white">{decision.prompt}</div>
       <div className="flex flex-col gap-3">
         {decision.options.map((opt, i) => (
           <StreamingBar
@@ -127,7 +130,7 @@ export default function DecisionWindow({
       </div>
       {!walletReady && (
         <div className="mt-2 text-center text-xs text-zinc-500">
-          Setting up your wallet — streaming will be enabled shortly...
+          Setting up your wallet - streaming will be enabled shortly...
         </div>
       )}
     </div>

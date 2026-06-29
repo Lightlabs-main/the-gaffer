@@ -9,9 +9,11 @@
  * One engine instance per session. Started when a match is kicked off
  * via POST /api/match/start.
  */
-import type { Session, MatchEvent } from './types'
+import type { Session } from './types'
+import { persistSession } from './session-store'
 import { broadcast } from './sse'
 import { openDecisionWindow } from './decision-lifecycle'
+import { appendProvenance } from './provenance'
 import {
   WINDOW_MATCH_MINUTES,
   windowTypeForIndex,
@@ -64,6 +66,16 @@ class MatchEngine {
     ms.status = 'first-half'
     ms.minute = 0
 
+    appendProvenance(this.session, {
+      category: 'session',
+      title: 'Match kicked off',
+      detail: 'The live clock started and the first simulation segment was queued.',
+      data: {
+        status: ms.status,
+        minute: ms.minute,
+      },
+    })
+
     broadcast(this.session, {
       kind: 'match-started',
       matchState: ms,
@@ -73,6 +85,7 @@ class MatchEngine {
     console.log(`[engine] Match started for session ${this.session.id}`)
 
     // Run initial simulation for opening minutes (1-9)
+    persistSession(this.session)
     void this.runSimulation(1, 9)
 
     // Start the clock
@@ -100,6 +113,15 @@ class MatchEngine {
     // Status transitions
     if (ms.minute === 45 && ms.status === 'first-half') {
       ms.status = 'half-time'
+      appendProvenance(this.session, {
+        category: 'session',
+        title: 'Half-time reached',
+        detail: 'The match entered the half-time pause.',
+        data: {
+          score: `${ms.homeTeam.score}-${ms.awayTeam.score}`,
+        },
+      })
+      persistSession(this.session)
       broadcast(this.session, {
         kind: 'status-change',
         status: 'half-time',
@@ -110,6 +132,15 @@ class MatchEngine {
       // Pause for half-time, then resume into second half
       this.clockTimer = setTimeout(() => {
         ms.status = 'second-half'
+        appendProvenance(this.session, {
+          category: 'session',
+          title: 'Second half started',
+          detail: 'The match resumed after half-time.',
+          data: {
+            score: `${ms.homeTeam.score}-${ms.awayTeam.score}`,
+          },
+        })
+        persistSession(this.session)
         broadcast(this.session, {
           kind: 'status-change',
           status: 'second-half',
@@ -125,11 +156,22 @@ class MatchEngine {
     if (ms.minute >= 90) {
       ms.minute = 90
       ms.status = 'full-time'
+      persistSession(this.session)
       // Final simulation for closing stretch
       void this.runSimulation(
         this.lastSimulatedMinute + 1,
         90,
       ).then(() => {
+        appendProvenance(this.session, {
+          category: 'result',
+          title: 'Final result recorded',
+          detail: `${ms.homeTeam.name} ${ms.homeTeam.score}-${ms.awayTeam.score} ${ms.awayTeam.name}.`,
+          data: {
+            homeScore: ms.homeTeam.score,
+            awayScore: ms.awayTeam.score,
+            totalEarned: ms.totalEarned,
+          },
+        })
         broadcast(this.session, {
           kind: 'status-change',
           status: 'full-time',
@@ -152,6 +194,7 @@ class MatchEngine {
       status: ms.status,
       serverTime: Date.now(),
     })
+    persistSession(this.session)
 
     // Check if we should open a decision window at this minute
     const windowMinutes = WINDOW_MATCH_MINUTES as readonly number[]
@@ -210,6 +253,20 @@ class MatchEngine {
       }
 
       this.lastSimulatedMinute = toMinute
+
+      appendProvenance(this.session, {
+        category: 'simulation',
+        title: 'Match segment simulated',
+        detail: `Claude simulated minutes ${fromMinute}-${toMinute} and returned ${result.events.length} events.`,
+        data: {
+          fromMinute,
+          toMinute,
+          model: result.model,
+          latencyMs: result.latencyMs,
+          eventIds: result.events.map((event) => event.id),
+        },
+      })
+      persistSession(this.session)
 
       broadcast(this.session, {
         kind: 'simulation',

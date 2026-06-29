@@ -18,26 +18,32 @@ import { createUserWallet, transferUsdcFromTreasury } from '@/lib/circle'
 import { waitForUsdcBalance } from '@/lib/circle'
 import { setSession } from '@/lib/session-store'
 import type { MatchState, Session } from '@/lib/types'
+import { appendProvenance } from '@/lib/provenance'
+import { getExperienceFormat, type ExperienceType } from '@/lib/experience-formats'
 
 export const dynamic = 'force-dynamic'
+
+const CREATOR_SEED_USDC = '0.05'
 
 interface CreateBody {
   awayTeamName?: string
   homeTeamName?: string
+  experienceType?: ExperienceType
 }
 
 export async function POST(req: Request): Promise<NextResponse> {
   let stage = 'parse'
   try {
     const body = (await req.json().catch(() => ({}))) as CreateBody
-    const homeName = body.homeTeamName?.trim() || 'The Crowd FC'
-    const awayName = body.awayTeamName?.trim() || 'Algorithm United'
+    const format = getExperienceFormat(body.experienceType)
+    const homeName = body.homeTeamName?.trim() || format.defaultHome
+    const awayName = body.awayTeamName?.trim() || format.defaultAway
 
     stage = 'wallet-create'
     const { walletId, address } = await createUserWallet()
 
     stage = 'wallet-fund'
-    const { transactionId } = await transferUsdcFromTreasury(address, '1')
+    const { transactionId } = await transferUsdcFromTreasury(address, CREATOR_SEED_USDC)
 
     stage = 'wait-balance'
     const balance = await waitForUsdcBalance(address)
@@ -46,6 +52,9 @@ export async function POST(req: Request): Promise<NextResponse> {
     const sessionId = randomUUID()
     const matchState: MatchState = {
       id: sessionId,
+      experienceType: format.id,
+      experienceLabel: format.label,
+      experienceSummary: format.summary,
       creatorWalletId: walletId,
       creatorAddress: address,
       homeTeam: {
@@ -70,8 +79,21 @@ export async function POST(req: Request): Promise<NextResponse> {
       matchState,
       participants: 0,
       createdAt: Date.now(),
+      provenanceEvents: [],
       sseClients: new Set(),
     }
+    appendProvenance(session, {
+      category: 'session',
+      title: 'Creator experience opened',
+      detail: `${format.label}: ${homeName} vs ${awayName} was created with a funded creator settlement wallet.`,
+      data: {
+        experienceType: format.id,
+        experienceLabel: format.label,
+        creatorWalletId: walletId,
+        creatorAddress: address,
+        fundingTransactionId: transactionId,
+      },
+    })
     setSession(session)
 
     console.log('[session/create] created', { sessionId, walletId, address, fundingTransactionId: transactionId })

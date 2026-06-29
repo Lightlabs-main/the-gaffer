@@ -7,8 +7,9 @@
  *   2. Reads the creator's USDC balance directly from the Arc Testnet USDC
  *      contract — the BEFORE number.
  *   3. Creates one participant wallet (POST /api/wallet/participant). This
- *      transfers 0.5 USDC from the treasury to the new wallet, approves the
- *      Circle GatewayWallet contract, and deposits 0.3 USDC into Gateway.
+ *      transfers a small demo USDC seed from the treasury to the new wallet,
+ *      approves the Circle GatewayWallet contract, and deposits part of it
+ *      into Gateway.
  *      Returns the on-chain balance and the Gateway-available balance.
  *   4. Opens a decision window (POST /api/decision/open) with a long
  *      duration so we don't race the auto-close.
@@ -96,8 +97,8 @@ async function main(): Promise<void> {
   const part = (await api('/api/wallet/participant', {
     body: JSON.stringify({
       sessionId,
-      treasuryUsdc: '0.5',
-      gatewayUsdc: '0.3',
+      treasuryUsdc: '0.05',
+      gatewayUsdc: '0.03',
     }),
   })) as {
     participant: {

@@ -1,6 +1,7 @@
 export type Formation = '4-4-2' | '4-3-3' | '3-5-2' | '4-2-3-1' | '5-3-2'
 export type Mentality = 'attacking' | 'balanced' | 'defensive'
 export type PressingStyle = 'high' | 'mid' | 'low'
+export type { ExperienceType } from './experience-formats'
 
 export interface DecisionOption {
   id: string
@@ -9,6 +10,12 @@ export interface DecisionOption {
   totalStreamed: number
   streamingRate: number
   lastUpdated: number
+}
+
+export interface DecisionTap {
+  optionId: string
+  amount: number
+  ts: number
 }
 
 export interface DecisionWindow {
@@ -26,6 +33,7 @@ export interface DecisionWindow {
   opensAt: number
   closesAt: number
   isOpen: boolean
+  taps?: DecisionTap[]
   result?: string
   managerSpeech?: string
 }
@@ -47,6 +55,9 @@ export interface MatchEvent {
 
 export interface MatchState {
   id: string
+  experienceType: import('./experience-formats').ExperienceType
+  experienceLabel: string
+  experienceSummary: string
   creatorWalletId: string
   creatorAddress: string
   homeTeam: {
@@ -68,6 +79,26 @@ export interface MatchState {
   totalEarned: number
 }
 
+export type ProvenanceCategory =
+  | 'session'
+  | 'window'
+  | 'stream'
+  | 'signal'
+  | 'manager'
+  | 'simulation'
+  | 'result'
+  | 'wallet'
+
+export interface ProvenanceEvent {
+  id: string
+  ts: number
+  minute: number
+  category: ProvenanceCategory
+  title: string
+  detail: string
+  data?: Record<string, unknown>
+}
+
 export interface UserWallet {
   walletId: string
   address: string
@@ -79,5 +110,6 @@ export interface Session {
   matchState: MatchState
   participants: number
   createdAt: number
+  provenanceEvents: ProvenanceEvent[]
   sseClients: Set<ReadableStreamDefaultController>
 }

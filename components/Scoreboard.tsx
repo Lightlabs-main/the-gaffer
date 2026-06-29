@@ -26,29 +26,27 @@ export default function Scoreboard({
   status,
 }: Props) {
   return (
-    <div className="w-full border border-[var(--pitch-dim)]/30 rounded-lg p-4 text-center">
-      <div className="flex items-center justify-center gap-6">
+    <div className="live-card field-lines w-full p-5 text-center">
+      <div className="flex items-center justify-center gap-4 sm:gap-8">
         <div className="flex-1 text-right">
-          <div className="text-lg font-bold text-[var(--pitch-green)]">
+          <div className="text-sm font-semibold uppercase tracking-[0.16em] text-zinc-200 sm:text-base">
             {homeName}
           </div>
         </div>
-        <div className="flex items-baseline gap-3 font-mono text-4xl font-bold tracking-wider">
+        <div className="rounded-xl bg-black/70 px-4 py-2 font-mono text-4xl font-semibold tracking-wider shadow-lg">
           <span>{homeScore}</span>
-          <span className="text-xl text-zinc-500">—</span>
+          <span className="mx-2 text-xl text-zinc-500">-</span>
           <span>{awayScore}</span>
         </div>
         <div className="flex-1 text-left">
-          <div className="text-lg font-bold text-zinc-400">{awayName}</div>
+          <div className="text-sm font-semibold uppercase tracking-[0.16em] text-zinc-400 sm:text-base">
+            {awayName}
+          </div>
         </div>
       </div>
       <div className="mt-2 flex items-center justify-center gap-2 text-sm">
-        <span className="font-mono text-[var(--pitch-green)]">
-          {minute}&apos;
-        </span>
-        <span className="text-zinc-500">
-          {STATUS_LABELS[status] ?? status}
-        </span>
+        <span className="font-mono text-[var(--accent)]">{minute}&apos;</span>
+        <span className="text-zinc-500">{STATUS_LABELS[status] ?? status}</span>
       </div>
     </div>
   )

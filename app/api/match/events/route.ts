@@ -55,6 +55,7 @@ export async function GET(req: Request): Promise<Response> {
         matchState: session.matchState,
         participants: session.participants,
         connectedClients: session.sseClients.size,
+        provenanceEvents: session.provenanceEvents,
         serverTime: Date.now(),
       }
       controller.enqueue(encoder.encode(`data: ${JSON.stringify(hello)}\n\n`))

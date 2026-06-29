@@ -6,9 +6,9 @@
  *     clears the per-window tap history, broadcasts `decision-opened`, and
  *     schedules an auto-close at the window's `closesAt`.
  *   - recordTap: append one tap to the per-window history and update the
- *     winning option's totalStreamed + streamingRate. Phase 5 (the x402
- *     stream endpoint) will be the real caller; Phase 4 uses it via a
- *     debug endpoint to construct scenarios.
+ *     winning option's totalStreamed + streamingRate. The x402 stream
+ *     endpoint is the live HTTP caller; tests should call the pure decision
+ *     engine directly instead of injecting money-free taps through HTTP.
  *   - closeDecisionWindow: idempotent. Runs the engine, sets isOpen=false +
  *     result + signal, broadcasts `decision-closed`.
  *
@@ -16,15 +16,16 @@
  * the shared types so we don't have to mutate the spec's interfaces).
  */
 import { randomUUID } from 'node:crypto'
-import type { Session, DecisionWindow, MatchEvent } from './types'
+import type { Session, DecisionWindow, MatchEvent, DecisionTap } from './types'
 import { broadcast } from './sse'
 import { decide, type EngineTap, type EngineResult } from './decision-engine'
 import { produceManagerVerdict } from './manager'
 import { resolveTactic } from './tactic-mapping'
+import { appendProvenance } from './provenance'
 
 interface WindowState {
   windowId: string
-  taps: EngineTap[]
+  taps: DecisionTap[]
   closeTimer: ReturnType<typeof setTimeout> | null
 }
 
@@ -43,18 +44,64 @@ export function getTaps(sessionId: string): EngineTap[] {
   return windowStateBySession.get(sessionId)?.taps ?? []
 }
 
+function getPersistedTaps(
+  session: Session,
+  decision: DecisionWindow,
+): DecisionTap[] {
+  const state = ensureWindowState(session.id, decision.id)
+  if (decision.taps?.length) {
+    state.taps = decision.taps
+    return decision.taps
+  }
+  if (state.taps.length) {
+    decision.taps = state.taps
+    return state.taps
+  }
+
+  // Older in-memory sessions may have option totals but no serialized tap
+  // list. Preserve the money signal so close/replay does not default to zero.
+  const rebuilt = decision.options
+    .filter((option) => option.totalStreamed > 0)
+    .map((option) => ({
+      optionId: option.id,
+      amount: option.totalStreamed,
+      ts: option.lastUpdated || Date.now(),
+    }))
+  decision.taps = rebuilt
+  state.taps = rebuilt
+  return rebuilt
+}
+
 export function openDecisionWindow(
   session: Session,
   window: DecisionWindow,
 ): DecisionWindow {
+  window.taps = []
   session.matchState.currentDecision = window
   const state = ensureWindowState(session.id, window.id)
-  state.taps = []
+  state.taps = window.taps
   // Auto-close on schedule
   const msUntilClose = Math.max(0, window.closesAt - Date.now())
   state.closeTimer = setTimeout(() => {
     closeDecisionWindow(session)
   }, msUntilClose)
+
+  appendProvenance(session, {
+    category: 'window',
+    title: 'Decision window opened',
+    detail: `${window.type} opened with ${window.options.length} crowd options.`,
+    data: {
+      windowId: window.id,
+      type: window.type,
+      prompt: window.prompt,
+      options: window.options.map((option) => ({
+        id: option.id,
+        label: option.label,
+      })),
+      opensAt: window.opensAt,
+      closesAt: window.closesAt,
+    },
+  })
 
   broadcast(session, {
     kind: 'decision-opened',
@@ -88,7 +135,10 @@ export function recordTap(session: Session, input: TapInput): {
     return { accepted: false, reason: 'window already closed by timestamp' }
   }
   const state = ensureWindowState(session.id, decision.id)
-  state.taps.push({ optionId: input.optionId, amount: input.amount, ts: now })
+  if (!decision.taps) decision.taps = state.taps
+  const tap = { optionId: input.optionId, amount: input.amount, ts: now }
+  state.taps.push(tap)
+  if (decision.taps !== state.taps) decision.taps.push(tap)
 
   option.totalStreamed += input.amount
   session.matchState.totalEarned += input.amount
@@ -100,6 +150,21 @@ export function recordTap(session: Session, input: TapInput): {
   const recentTotal = recentForOption.reduce((a, b) => a + b.amount, 0)
   option.streamingRate = recentTotal / 2
   option.lastUpdated = now
+
+  appendProvenance(session, {
+    category: 'stream',
+    title: 'USDC stream counted',
+    detail: `${input.amount.toFixed(6)} USDC moved toward "${option.label}".`,
+    data: {
+      windowId: decision.id,
+      optionId: input.optionId,
+      optionLabel: option.label,
+      amountUsdc: input.amount,
+      totalForOption: option.totalStreamed,
+      totalEarned: session.matchState.totalEarned,
+    },
+    ts: now,
+  })
 
   // Per-tap broadcast so the UI bar moves in real time
   broadcast(session, {
@@ -131,11 +196,25 @@ export function closeDecisionWindow(session: Session): {
   }
   const engine = decide({
     options: decision.options.map((o) => ({ id: o.id, label: o.label })),
-    taps: state.taps,
+    taps: getPersistedTaps(session, decision),
     windowClosesAt: decision.closesAt,
   })
   decision.isOpen = false
   decision.result = engine.winnerLabel
+  appendProvenance(session, {
+    category: 'signal',
+    title: 'Crowd signal resolved',
+    detail: `"${engine.winnerLabel}" won with ${engine.totalStreamed.toFixed(6)} USDC streamed.`,
+    data: {
+      windowId: decision.id,
+      winnerLabel: engine.winnerLabel,
+      confidence: engine.confidence,
+      winnerShare: engine.winnerShare,
+      totalStreamed: engine.totalStreamed,
+      signal: engine.signal,
+      breakdown: engine.breakdown,
+    },
+  })
   broadcast(session, {
     kind: 'decision-closed',
     window: decision,
@@ -203,6 +282,20 @@ async function runManagerForWindow(
       appliedTactic = { kind: 'noop', reason: tactic.reason }
     }
 
+    appendProvenance(session, {
+      category: 'manager',
+      title: 'AI manager responded',
+      detail: tacticSummary(appliedTactic),
+      data: {
+        windowId: decision.id,
+        speech: verdict.speech,
+        model: verdict.model,
+        latencyMs: verdict.latencyMs,
+        requestId: verdict.requestId,
+        tactic: appliedTactic,
+      },
+    })
+
     broadcast(session, {
       kind: 'manager-spoke',
       windowId: decision.id,
@@ -223,4 +316,19 @@ async function runManagerForWindow(
       serverTime: Date.now(),
     })
   }
+}
+
+function tacticSummary(
+  tactic:
+    | { kind: 'state'; field: string; value: string; previous: string }
+    | { kind: 'event'; eventType: string; text: string }
+    | { kind: 'noop'; reason: string },
+): string {
+  if (tactic.kind === 'state') {
+    return `Manager changed ${tactic.field} from ${tactic.previous} to ${tactic.value}.`
+  }
+  if (tactic.kind === 'event') {
+    return `Manager logged a ${tactic.eventType} response.`
+  }
+  return `Manager made no tactical change: ${tactic.reason}.`
 }

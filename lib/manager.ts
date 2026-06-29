@@ -16,7 +16,7 @@
  * Anti-fake: a real Claude API call happens; we surface the raw response
  * text and the model id back to the caller for audit.
  */
-import { getAnthropicClient, MANAGER_MODEL } from './anthropic'
+import { getAnthropicClient, managerModel } from './anthropic'
 import type { DecisionWindow, MatchState } from './types'
 import type { EngineResult } from './decision-engine'
 
@@ -40,10 +40,11 @@ export async function produceManagerVerdict(opts: {
   engine: EngineResult
 }): Promise<ManagerVerdict> {
   const client = getAnthropicClient()
+  const model = managerModel()
   const { system, user } = buildPrompt(opts)
   const started = Date.now()
   const response = await client.messages.create({
-    model: MANAGER_MODEL,
+    model,
     max_tokens: 300,
     system,
     messages: [{ role: 'user', content: user }],

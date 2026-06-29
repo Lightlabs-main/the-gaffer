@@ -8,11 +8,11 @@
  *
  *   1. Creates a fresh Circle developer-controlled wallet on Arc Testnet.
  *   2. Sends `treasuryUsdc` USDC from the project treasury to that wallet
- *      (default 0.5).
+ *      (default 0.05).
  *   3. Waits for the on-chain balance to land (poll Arc Testnet USDC contract).
  *   4. Approves the Circle GatewayWallet contract to spend `gatewayUsdc`
  *      USDC of that wallet, then calls `depositFor(usdc, depositor, amount)`
- *      against GatewayWallet (default 0.3 USDC).
+ *      against GatewayWallet (default 0.03 USDC).
  *   5. Records the wallet in the per-session participant registry so
  *      /api/decision/stream can look it up by walletId.
  *
@@ -20,12 +20,12 @@
  * the caller can prove every step happened against real chain state.
  *
  * Cost note: Arc Testnet charges gas in USDC, so the treasury seed has to
- * cover both the deposit amount and the gas for approve+deposit. 0.5 USDC
- * comfortably covers 0.3 deposit + ~0.005 USDC of total gas.
+ * cover both the deposit amount and the gas for approve+deposit. The demo
+ * seed is intentionally small so the testnet treasury survives repeated joins.
  */
 import { NextResponse } from 'next/server'
 import type { Address } from 'viem'
-import { getSession } from '@/lib/session-store'
+import { getSession, persistSession } from '@/lib/session-store'
 import {
   createUserWallet,
   transferUsdcFromTreasury,
@@ -38,9 +38,12 @@ export const dynamic = 'force-dynamic'
 
 interface Body {
   sessionId?: string
-  treasuryUsdc?: string // decimal e.g. "0.5"
-  gatewayUsdc?: string // decimal e.g. "0.3"
+  treasuryUsdc?: string // decimal e.g. "0.05"
+  gatewayUsdc?: string // decimal e.g. "0.03"
 }
+
+const PARTICIPANT_SEED_USDC = '0.05'
+const PARTICIPANT_GATEWAY_USDC = '0.03'
 
 export async function POST(req: Request): Promise<NextResponse> {
   let stage = 'parse'
@@ -56,8 +59,8 @@ export async function POST(req: Request): Promise<NextResponse> {
         { status: 404 },
       )
     }
-    const treasuryUsdc = body.treasuryUsdc ?? '0.5'
-    const gatewayUsdc = body.gatewayUsdc ?? '0.3'
+    const treasuryUsdc = body.treasuryUsdc ?? PARTICIPANT_SEED_USDC
+    const gatewayUsdc = body.gatewayUsdc ?? PARTICIPANT_GATEWAY_USDC
 
     stage = 'wallet-create'
     const { walletId, address } = await createUserWallet()
@@ -96,6 +99,7 @@ export async function POST(req: Request): Promise<NextResponse> {
       createdAt: Date.now(),
     })
     session.participants += 1
+    persistSession(session)
 
     return NextResponse.json({
       sessionId: session.id,

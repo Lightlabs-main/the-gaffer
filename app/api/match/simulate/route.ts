@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session-store'
 import { simulateMatchSegment } from '@/lib/match-simulator'
 import { broadcast } from '@/lib/sse'
+import { appendProvenance } from '@/lib/provenance'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,6 +51,19 @@ export async function POST(req: Request): Promise<NextResponse> {
         ms.awayTeam.score++
       }
     }
+
+    appendProvenance(session, {
+      category: 'simulation',
+      title: 'Manual segment simulated',
+      detail: `Manual simulation covered minutes ${fromMinute}-${toMinute} with ${result.events.length} events.`,
+      data: {
+        fromMinute,
+        toMinute,
+        model: result.model,
+        latencyMs: result.latencyMs,
+        eventIds: result.events.map((event) => event.id),
+      },
+    })
 
     // Broadcast to SSE clients
     broadcast(session, {

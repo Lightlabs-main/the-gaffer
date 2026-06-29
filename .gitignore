@@ -45,3 +45,7 @@ circle-recovery.dat
 circle-recovery*.dat
 recovery_file_*.dat
 *.recovery.dat
+
+# Local demo runtime state
+.gaffer-store/
+.gaffer-dev.*.log

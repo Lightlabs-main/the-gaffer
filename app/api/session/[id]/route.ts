@@ -25,5 +25,6 @@ export async function GET(
     participants: session.participants,
     createdAt: session.createdAt,
     connectedClients: session.sseClients.size,
+    provenanceEvents: session.provenanceEvents,
   })
 }

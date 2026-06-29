@@ -1,5 +1,8 @@
 'use client'
 
+import { useState } from 'react'
+import { shortAddress } from '@/lib/client-profile'
+
 interface Props {
   address: string | null
   status: 'loading' | 'ready' | 'error'
@@ -13,9 +16,21 @@ export default function WalletStatus({
   totalEarned,
   error,
 }: Props) {
+  const [copied, setCopied] = useState(false)
+
+  async function copyAddress() {
+    if (!address) return
+    await navigator.clipboard.writeText(address)
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1500)
+  }
+
   return (
-    <div className="w-full flex items-center justify-between rounded-lg border border-zinc-800/50 px-3 py-2 text-xs">
-      <div className="flex items-center gap-2">
+    <div className="match-panel w-full px-3 py-3 text-xs">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="font-semibold uppercase tracking-wider text-zinc-950">
+          Your player wallet
+        </div>
         <div
           className={`h-2 w-2 rounded-full ${
             status === 'ready'
@@ -25,20 +40,27 @@ export default function WalletStatus({
                 : 'bg-red-500'
           }`}
         />
-        {status === 'loading' && (
-          <span className="text-zinc-400">Setting up wallet...</span>
-        )}
-        {status === 'ready' && address && (
-          <span className="font-mono text-zinc-500">
-            {address.slice(0, 6)}...{address.slice(-4)}
-          </span>
-        )}
-        {status === 'error' && (
-          <span className="text-red-400">{error || 'Wallet error'}</span>
-        )}
       </div>
-      <div className="font-mono text-[var(--pitch-dim)]">
-        {totalEarned.toFixed(4)} USDC earned
+      {status === 'loading' && (
+        <span className="text-zinc-400">Creating and funding your wallet...</span>
+      )}
+      {status === 'ready' && address && (
+        <div className="flex items-center justify-between gap-3">
+          <button
+            onClick={copyAddress}
+            className="font-mono text-zinc-700 underline decoration-zinc-300 underline-offset-4 hover:text-[var(--pitch-green)]"
+            title="Copy your player wallet address"
+          >
+            {copied ? 'address copied' : shortAddress(address)}
+          </button>
+          <span className="text-zinc-500">click to copy</span>
+        </div>
+      )}
+      {status === 'error' && (
+        <span className="text-red-400">{error || 'Wallet error'}</span>
+      )}
+      <div className="mt-3 border-t border-zinc-200 pt-2 font-mono text-[var(--pitch-dim)]">
+        Creator earned in this match: {totalEarned.toFixed(4)} USDC
       </div>
     </div>
   )

@@ -10,7 +10,7 @@
  * Anti-fake: real Claude API call, real JSON parsing, no hardcoded events.
  */
 import { randomUUID } from 'node:crypto'
-import { getAnthropicClient, MANAGER_MODEL } from './anthropic'
+import { getAnthropicClient, managerModel } from './anthropic'
 import type { MatchState, MatchEvent } from './types'
 
 export interface SimulationResult {
@@ -29,6 +29,7 @@ export async function simulateMatchSegment(opts: {
   toMinute: number
 }): Promise<SimulationResult> {
   const client = getAnthropicClient()
+  const model = managerModel()
   const { matchState, fromMinute, toMinute } = opts
   const home = matchState.homeTeam
   const away = matchState.awayTeam
@@ -57,7 +58,7 @@ export async function simulateMatchSegment(opts: {
 
   const started = Date.now()
   const response = await client.messages.create({
-    model: MANAGER_MODEL,
+    model,
     max_tokens: 500,
     messages: [{ role: 'user', content: userPrompt }],
   })
@@ -99,27 +100,12 @@ function parseSimulatorResponse(
     parsed = JSON.parse(cleaned)
   } catch {
     console.error('[simulator] failed to parse JSON:', raw)
-    // Fallback: generate a commentary event so the match doesn't stall
-    return [
-      {
-        id: randomUUID(),
-        minute: Math.floor((fromMinute + toMinute) / 2),
-        type: 'commentary',
-        text: 'Play continues with both sides probing for openings.',
-      },
-    ]
+    throw new Error('Claude simulator returned invalid JSON')
   }
 
   if (!Array.isArray(parsed)) {
     console.error('[simulator] response was not an array:', parsed)
-    return [
-      {
-        id: randomUUID(),
-        minute: Math.floor((fromMinute + toMinute) / 2),
-        type: 'commentary',
-        text: 'Midfield battle as both teams jostle for control.',
-      },
-    ]
+    throw new Error('Claude simulator response was not a JSON array')
   }
 
   const validTypes = new Set([
@@ -132,7 +118,7 @@ function parseSimulatorResponse(
     'commentary',
   ])
 
-  return parsed
+  const events = parsed
     .filter(
       (e: unknown): e is { minute: number; type: string; text: string; isGoal?: boolean } =>
         typeof e === 'object' &&
@@ -151,4 +137,10 @@ function parseSimulatorResponse(
       text: e.text.slice(0, 150), // safety cap
       isGoal: e.type === 'goal' || e.type === 'goal-conceded' ? true : undefined,
     }))
+
+  if (events.length < 2) {
+    throw new Error(`Claude simulator returned ${events.length} valid events; expected at least 2`)
+  }
+
+  return events
 }

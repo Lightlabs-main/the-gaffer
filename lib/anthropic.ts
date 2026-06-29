@@ -20,4 +20,6 @@ export function getAnthropicClient(): Anthropic {
  * Pinned model id. The user spec mandates Claude Sonnet 4.6 for the
  * Hackathon submission — do not silently fall back to other models.
  */
-export const MANAGER_MODEL = 'claude-sonnet-4-6'
+export function managerModel(): string {
+  return env.anthropicModel()
+}

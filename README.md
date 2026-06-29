@@ -214,6 +214,7 @@ CIRCLE_API_KEY=TEST_API_KEY:your-circle-api-key
 ENTITY_SECRET=your-entity-secret
 CIRCLE_WALLET_SET_ID=your-wallet-set-id
 ANTHROPIC_API_KEY=sk-ant-your-anthropic-key
+ANTHROPIC_MODEL=claude-opus-4-8
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 TREASURY_WALLET_ID=your-treasury-wallet-id
 TREASURY_ADDRESS=0xyour-treasury-address
@@ -227,6 +228,9 @@ npm install
 
 # Configure Circle wallets (creates wallet set, entity secret, treasury wallet)
 npm run setup:circle
+
+# Install the Canteen ARC CLI used by the Lepton hackathon context
+npm run setup:arc-cli
 
 # Verify wallet setup
 npm run verify:wallet
@@ -246,6 +250,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint |
 | `npm run setup:circle` | Configure Circle wallets and entity secret |
+| `npm run setup:arc-cli` | Install the Canteen ARC CLI via `uv tool install git+https://github.com/the-canteen-dev/ARC-cli` |
 | `npm run verify:wallet` | Verify wallet endpoints are working |
 | `npm run test:decision-engine` | Run confidence-level test scenarios |
 | `npm run test:phase5` | Test x402 payment pipeline |
@@ -422,9 +427,8 @@ gaffer/
 │   │   ├── decision/
 │   │   │   ├── close/route.ts       # Close decision window
 │   │   │   ├── current/route.ts     # Get current window
-│   │   │   ├── open/route.ts        # Open window (debug)
+│   │   │   ├── open/route.ts        # Open window
 │   │   │   ├── stream/route.ts      # x402 payment endpoint
-│   │   │   └── tap/route.ts         # Debug tap injection
 │   │   ├── manager/
 │   │   │   └── speak/route.ts       # Manual manager speech
 │   │   ├── match/

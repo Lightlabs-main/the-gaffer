@@ -27,25 +27,25 @@ export default function MatchCommentary({ events }: Props) {
 
   if (sorted.length === 0) {
     return (
-      <div className="w-full rounded-lg border border-zinc-800/50 p-4 text-center text-sm text-zinc-600">
+      <div className="match-panel w-full p-4 text-center text-sm text-zinc-600">
         Match events will appear here...
       </div>
     )
   }
 
   return (
-    <div className="w-full rounded-lg border border-zinc-800/50 p-3">
-      <div className="mb-2 text-xs font-bold uppercase tracking-wider text-zinc-500">
+    <div className="match-panel w-full p-4">
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
         Commentary
       </div>
-      <div className="flex flex-col gap-1 max-h-48 overflow-y-auto">
+      <div className="flex max-h-56 flex-col gap-1 overflow-y-auto">
         {sorted.map((event) => (
           <div
             key={event.id}
             className={`flex items-start gap-2 rounded px-2 py-1 text-sm ${
               event.isGoal
-                ? 'bg-[var(--pitch-green)]/10 text-[var(--pitch-green)]'
-                : 'text-zinc-400'
+                ? 'bg-emerald-50 text-[var(--pitch-green)]'
+                : 'text-zinc-700'
             }`}
           >
             <span className="shrink-0 w-8 font-mono text-xs text-zinc-500">

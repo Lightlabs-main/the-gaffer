@@ -14,6 +14,8 @@ import { createUserWallet, transferUsdcFromTreasury, waitForUsdcBalance } from '
 // Force dynamic — this endpoint mutates external state.
 export const dynamic = 'force-dynamic'
 
+const LOGIN_SEED_USDC = '0.05'
+
 function detailErr(err: unknown): { stage: string; message: string; details: unknown } {
   // Circle SDK errors expose: message, code, errors[], status, response.data.
   // Surface everything we can so the failure isn't opaque.
@@ -45,7 +47,7 @@ export async function POST(): Promise<NextResponse> {
     console.log('[wallet/create] created', { walletId, address })
 
     stage = 'fund'
-    const { transactionId } = await transferUsdcFromTreasury(address, '1')
+    const { transactionId } = await transferUsdcFromTreasury(address, LOGIN_SEED_USDC)
     console.log('[wallet/create] treasury transfer initiated', { transactionId, to: address })
 
     stage = 'wait-balance'
