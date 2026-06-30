@@ -154,6 +154,117 @@ html.dark .match-panel {
   border: 2px solid var(--line);
 }
 
+.live-pitch {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(250, 204, 21, 0.18), transparent 7rem),
+    linear-gradient(90deg, transparent 49.5%, rgba(255, 255, 255, 0.32) 49.5%, rgba(255, 255, 255, 0.32) 50.5%, transparent 50.5%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0 9%, rgba(255, 255, 255, 0.02) 9% 18%),
+    linear-gradient(135deg, #0a8f52 0%, #06643f 42%, #05402f 100%);
+  box-shadow: inset 0 0 90px rgba(0, 0, 0, 0.34);
+}
+
+.live-pitch::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 18px;
+  pointer-events: none;
+}
+
+.live-pitch::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(97, 218, 251, 0.18), transparent 8rem),
+    radial-gradient(circle at 80% 70%, rgba(250, 204, 21, 0.2), transparent 9rem);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.live-player {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #06110d;
+  animation: player-bob 1.8s ease-in-out infinite;
+}
+
+.live-player::after {
+  content: "";
+  position: absolute;
+  inset: 31px 4px auto;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22);
+  filter: blur(2px);
+}
+
+.live-player-home {
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  background: linear-gradient(135deg, #facc15, #22c55e);
+  box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.22), 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+.live-player-away {
+  border: 2px solid rgba(255, 255, 255, 0.88);
+  background: linear-gradient(135deg, #38bdf8, #f472b6);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2), 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+.live-ball {
+  position: absolute;
+  z-index: 4;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  border: 2px solid #111827;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 35% 35%, #ffffff 0 26%, #111827 27% 33%, #f8fafc 34% 100%);
+  box-shadow: 0 0 0 8px rgba(250, 204, 21, 0.2), 0 0 28px rgba(250, 204, 21, 0.75);
+  transition: left 700ms ease, top 700ms ease;
+  animation: ball-pop 1.2s ease-in-out infinite;
+}
+
+.crowd-ribbon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  height: 18px;
+  background:
+    repeating-linear-gradient(90deg, #facc15 0 12px, #22c55e 12px 24px, #38bdf8 24px 36px, #f472b6 36px 48px);
+  opacity: 0.88;
+}
+
+.crowd-ribbon-top {
+  top: 0;
+}
+
+.crowd-ribbon-bottom {
+  bottom: 0;
+}
+
+@keyframes player-bob {
+  0%, 100% { margin-top: -2px; }
+  50% { margin-top: 3px; }
+}
+
+@keyframes ball-pop {
+  0%, 100% { scale: 1; }
+  50% { scale: 1.18; }
+}
+
 html.dark .bg-white,
 html.dark .bg-zinc-50,
 html.dark .bg-zinc-100 {

@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import AccountPanel from '@/components/AccountPanel'
 import Scoreboard from '@/components/Scoreboard'
+import LivePlayerStream from '@/components/LivePlayerStream'
 import ManagerSpeech from '@/components/ManagerSpeech'
 import DecisionWindow from '@/components/DecisionWindow'
 import MatchCommentary from '@/components/MatchCommentary'
@@ -502,6 +503,15 @@ export default function MatchRoom({ sessionId }: Props) {
           awayScore={matchState.awayTeam.score}
           minute={matchState.minute}
           status={matchState.status}
+        />
+
+        <LivePlayerStream
+          minute={matchState.minute}
+          status={matchState.status}
+          homeTeam={matchState.homeTeam}
+          awayTeam={matchState.awayTeam}
+          events={matchState.events}
+          currentDecision={matchState.currentDecision}
         />
 
         {/* Formation/tactic display */}
