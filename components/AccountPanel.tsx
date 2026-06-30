@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import {
   clearProfileIdentity,
   readProfileIdentity,
+  readProfileIdentityByEmail,
   saveProfileIdentity,
   shortAddress,
   type ProfileIdentity,
@@ -14,9 +15,9 @@ interface WalletCreateResponse {
   address?: string
   balance?: string
   balanceRaw?: string
-  fundingTransactionId?: string
   chainId?: number
   asset?: string
+  fundingRequired?: boolean
   message?: string
   stage?: string
   details?: unknown
@@ -28,6 +29,11 @@ export default function AccountPanel() {
   )
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [withdrawAmount, setWithdrawAmount] = useState('')
+  const [withdrawDestination, setWithdrawDestination] = useState('')
+  const [walletAction, setWalletAction] = useState<string | null>(null)
+  const [withdrawing, setWithdrawing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -45,6 +51,15 @@ export default function AccountPanel() {
     setError(null)
 
     try {
+      const existing = readProfileIdentityByEmail(trimmedEmail)
+      if (existing) {
+        saveProfileIdentity(existing)
+        setIdentity(existing)
+        setEmail('')
+        window.dispatchEvent(new Event('gaffer-auth-changed'))
+        return
+      }
+
       const res = await fetch('/api/wallet/create', { method: 'POST' })
       const data = (await res.json()) as WalletCreateResponse
       if (!res.ok || !data.walletId || !data.address) {
@@ -60,9 +75,9 @@ export default function AccountPanel() {
         address: data.address,
         balance: data.balance,
         balanceRaw: data.balanceRaw,
-        fundingTransactionId: data.fundingTransactionId,
         chainId: data.chainId,
         asset: data.asset,
+        fundingRequired: data.fundingRequired,
         createdAt: Date.now(),
       }
       saveProfileIdentity(nextIdentity)
@@ -83,6 +98,43 @@ export default function AccountPanel() {
     window.dispatchEvent(new Event('gaffer-auth-changed'))
   }
 
+  async function copyAddress(label: string) {
+    if (!identity?.address) return
+    await navigator.clipboard.writeText(identity.address)
+    setCopied(true)
+    setWalletAction(label)
+    window.setTimeout(() => setCopied(false), 1500)
+  }
+
+  async function withdrawGateway() {
+    if (!identity || !withdrawAmount || withdrawing) return
+    setWithdrawing(true)
+    setWalletAction(null)
+    setError(null)
+    try {
+      const res = await fetch('/api/wallet/gateway/withdraw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletId: identity.walletId,
+          address: identity.address,
+          amountUsdc: withdrawAmount,
+          destinationAddress: withdrawDestination || identity.address,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || data.message || 'Gateway withdrawal failed')
+      }
+      setWalletAction(`Withdrawal submitted: ${data.transactionId}`)
+      setWithdrawAmount('')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Gateway withdrawal failed')
+    } finally {
+      setWithdrawing(false)
+    }
+  }
+
   return (
     <section className="match-panel p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -98,15 +150,65 @@ export default function AccountPanel() {
         <div>
           <div className="text-lg font-semibold text-zinc-950">{identity.email}</div>
           <p className="mt-1 text-xs leading-5 text-zinc-500">
-            A real Circle wallet was created for this local profile.
+            A real Circle wallet was created for this local profile. Fund it
+            with Arc Testnet USDC before streaming.
           </p>
-          <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 font-mono text-xs text-[var(--pitch-green)]">
-            {shortAddress(identity.address)}
+          <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+              Wallet address
+            </div>
+            <button
+              onClick={() => void copyAddress('Address copied')}
+              className="mt-1 w-full break-all text-left font-mono text-xs text-[var(--pitch-green)] underline decoration-zinc-300 underline-offset-4"
+              title="Copy wallet address"
+            >
+              {identity.address}
+            </button>
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-zinc-500">
             <span>{identity.asset ?? 'Arc Testnet wallet'}</span>
             <span className="text-right">{identity.balance ?? '0'} USDC</span>
           </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              onClick={() => void copyAddress('Deposit address copied')}
+              className="rounded-lg bg-[var(--pitch-green)] px-3 py-2 text-xs font-semibold text-white"
+            >
+              {copied ? 'Copied' : 'Deposit'}
+            </button>
+            <button
+              onClick={() => setWithdrawDestination(identity.address)}
+              className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-700 hover:border-[var(--pitch-green)]/60"
+            >
+              Withdraw
+            </button>
+          </div>
+          <div className="mt-3 grid gap-2">
+            <input
+              value={withdrawAmount}
+              onChange={(e) => setWithdrawAmount(e.target.value)}
+              placeholder="Gateway withdraw amount"
+              className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-950 outline-none focus:border-[var(--pitch-green)]"
+            />
+            <input
+              value={withdrawDestination}
+              onChange={(e) => setWithdrawDestination(e.target.value)}
+              placeholder={shortAddress(identity.address)}
+              className="rounded-lg border border-zinc-200 bg-white px-3 py-2 font-mono text-xs text-zinc-950 outline-none focus:border-[var(--pitch-green)]"
+            />
+            <button
+              onClick={() => void withdrawGateway()}
+              disabled={!withdrawAmount || withdrawing}
+              className="rounded-lg border border-[var(--pitch-dim)] px-3 py-2 text-xs font-semibold text-[var(--pitch-green)] disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {withdrawing ? 'Withdrawing...' : 'Withdraw Gateway balance'}
+            </button>
+          </div>
+          {walletAction && (
+            <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-xs text-emerald-700">
+              {walletAction}
+            </div>
+          )}
           <button
             onClick={signOut}
             className="mt-3 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-semibold text-zinc-700 hover:border-[var(--pitch-green)]/60"

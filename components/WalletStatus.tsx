@@ -8,6 +8,9 @@ interface Props {
   status: 'loading' | 'ready' | 'error'
   totalEarned: number
   error?: string | null
+  gatewayReady?: boolean
+  preparingGateway?: boolean
+  onPrepareGateway?: () => void
 }
 
 export default function WalletStatus({
@@ -15,6 +18,9 @@ export default function WalletStatus({
   status,
   totalEarned,
   error,
+  gatewayReady = false,
+  preparingGateway = false,
+  onPrepareGateway,
 }: Props) {
   const [copied, setCopied] = useState(false)
 
@@ -42,18 +48,34 @@ export default function WalletStatus({
         />
       </div>
       {status === 'loading' && (
-        <span className="text-zinc-400">Creating and funding your wallet...</span>
+        <span className="text-zinc-400">Creating your player wallet...</span>
       )}
       {status === 'ready' && address && (
-        <div className="flex items-center justify-between gap-3">
-          <button
-            onClick={copyAddress}
-            className="font-mono text-zinc-700 underline decoration-zinc-300 underline-offset-4 hover:text-[var(--pitch-green)]"
-            title="Copy your player wallet address"
-          >
-            {copied ? 'address copied' : shortAddress(address)}
-          </button>
-          <span className="text-zinc-500">click to copy</span>
+        <div>
+          <div className="flex items-center justify-between gap-3">
+            <button
+              onClick={copyAddress}
+              className="font-mono text-zinc-700 underline decoration-zinc-300 underline-offset-4 hover:text-[var(--pitch-green)]"
+              title="Copy your player wallet address"
+            >
+              {copied ? 'address copied' : shortAddress(address)}
+            </button>
+            <span className="text-zinc-500">click to copy</span>
+          </div>
+          <div className="mt-2 rounded-lg border border-zinc-200 bg-zinc-50 p-2 text-zinc-600">
+            {gatewayReady
+              ? 'Gateway ready for streaming.'
+              : 'Fund this wallet with Arc Testnet USDC, then prepare it for streaming.'}
+          </div>
+          {!gatewayReady && onPrepareGateway && (
+            <button
+              onClick={onPrepareGateway}
+              disabled={preparingGateway}
+              className="mt-2 w-full rounded-lg border border-[var(--pitch-dim)] px-3 py-2 font-semibold text-[var(--pitch-green)] disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {preparingGateway ? 'Preparing Gateway...' : 'Prepare for streaming'}
+            </button>
+          )}
         </div>
       )}
       {status === 'error' && (

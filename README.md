@@ -31,7 +31,7 @@ Eight decision windows open during the match at minutes 10, 20, 30, 40, 55, 65, 
 
 ### Streaming Payments
 
-Each participant gets a custodial wallet pre-funded with test USDC — no MetaMask, no seed phrases, no Web3 knowledge required. During a decision window, holding a button streams **$0.0001 USDC per 500ms** toward your chosen option via Circle's x402 payment protocol. Taps are only recorded after successful on-chain settlement. The option that accumulates the most money wins.
+Each participant gets a custodial Circle wallet on signup — no MetaMask, no seed phrases, no Web3 knowledge required. Participants fund their own wallet with Arc Testnet USDC, prepare it for Circle Gateway, then holding a button streams **$0.0001 USDC per 500ms** toward the chosen option via x402. Taps are only recorded after successful settlement. The option that accumulates the most money wins.
 
 ### Crowd Confidence
 
@@ -103,7 +103,7 @@ After each decision, Claude simulates the next stretch of the match. The simulat
 | **AI Manager** | `lib/manager.ts` | Generates football-manager monologues via Claude, tone-matched to crowd confidence |
 | **Tactic Mapping** | `lib/tactic-mapping.ts` | Deterministic lookup table: decision result → match state mutation. No LLM in the loop |
 | **Window Catalog** | `lib/window-catalog.ts` | Decision templates, schedule (minutes 10–85), type rotation |
-| **Circle Integration** | `lib/circle.ts` | Developer-controlled wallet creation, treasury transfers, typed data signing |
+| **Circle Integration** | `lib/circle.ts` | Developer-controlled wallet creation and typed data signing |
 | **Gateway** | `lib/gateway.ts` | Circle Gateway deposits, x402 batching, EIP-712 authorization signing |
 | **Batch Signer** | `lib/dcw-batch-signer.ts` | Signs `TransferWithAuthorization` payloads via Circle's signTypedData API |
 | **Chain Client** | `lib/chain.ts` | Viem public client for Arc Testnet — balance reads, allowance checks, tx confirmations |
@@ -356,9 +356,9 @@ Returns session metadata and current match state.
 
 **`POST /api/wallet/participant`**
 
-Creates a custodial wallet for a joining participant, funds it from treasury, and deposits into Circle Gateway.
+Registers a joining participant wallet. If `prepareGateway` is true, the route deposits from that already-funded user wallet into Circle Gateway.
 
-Request: `{ "sessionId": "uuid" }`
+Request: `{ "sessionId": "uuid", "walletId": "uuid", "address": "0x...", "prepareGateway": true }`
 
 Response:
 ```json
@@ -366,8 +366,9 @@ Response:
   "participant": {
     "walletId": "uuid",
     "address": "0x...",
-    "treasuryFundedUsdc": "0.5",
-    "gatewayDepositedUsdc": "0.3"
+    "balanceOnChain": "1",
+    "gatewayAvailable": "0.05",
+    "gatewayReady": true
   }
 }
 ```

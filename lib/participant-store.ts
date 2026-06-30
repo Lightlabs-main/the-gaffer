@@ -1,13 +1,12 @@
 /**
  * Per-session participant wallet registry — in-memory, server-only.
  *
- * When a viewer joins a match session they get their own developer-controlled
- * wallet (created on demand via /api/wallet/participant). That wallet is the
- * one whose signed EIP-3009 authorizations get settled through Circle
- * Gateway when the participant taps to stream USDC during a decision window.
+ * When a viewer joins a match session, their Circle developer-controlled
+ * wallet is registered here. If they later fund and deposit it into Gateway,
+ * that same wallet signs the x402 steering authorizations.
  *
  * We keep this side-store separate from `Session` because:
- *   - it's an implementation detail of Phase 5 payments;
+ *   - it's an implementation detail of payment routing;
  *   - the shared `Session` shape is broadcast over SSE to the UI and we
  *     don't want to leak walletIds into client-facing payloads.
  */
@@ -16,12 +15,10 @@ import type { Address } from 'viem'
 export interface ParticipantWallet {
   walletId: string
   address: Address
-  /** Decimal USDC the treasury sent to this wallet on create. */
-  treasuryFundedUsdc: string
-  /** Decimal USDC deposited into the Circle GatewayWallet contract. */
-  gatewayDepositedUsdc: string
-  approveTransactionId: string
-  depositTransactionId: string
+  /** Decimal USDC deposited into the Circle GatewayWallet contract, if ready. */
+  gatewayDepositedUsdc?: string
+  approveTransactionId?: string
+  depositTransactionId?: string
   createdAt: number
 }
 

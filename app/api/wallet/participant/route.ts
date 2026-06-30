@@ -1,47 +1,40 @@
 /**
  * POST /api/wallet/participant
  *
- * Body: { sessionId: string, treasuryUsdc?: string, gatewayUsdc?: string }
+ * Body: { sessionId: string, walletId?: string, address?: string,
+ *         prepareGateway?: boolean, gatewayUsdc?: string }
  *
- * One call that does everything a new joiner needs to be able to stream
- * USDC inside a match session:
+ * Registers a joiner's wallet for a match session.
  *
- *   1. Creates a fresh Circle developer-controlled wallet on Arc Testnet.
- *   2. Sends `treasuryUsdc` USDC from the project treasury to that wallet
- *      (default 1.0000).
- *   3. Waits for the on-chain balance to land (poll Arc Testnet USDC contract).
- *   4. Approves the Circle GatewayWallet contract to spend `gatewayUsdc`
- *      USDC of that wallet, then calls `depositFor(usdc, depositor, amount)`
- *      against GatewayWallet (default 0.05 USDC).
- *   5. Records the wallet in the per-session participant registry so
+ *   1. Uses the signed-up Circle wallet passed by the browser, or creates a
+ *      fresh Circle developer-controlled wallet if none exists yet.
+ *   2. Reads the wallet's real Arc Testnet USDC balance.
+ *   3. If `prepareGateway` is true, approves and deposits `gatewayUsdc`
+ *      into Circle Gateway so the wallet can stream x402 taps.
+ *   4. Records the wallet in the per-session participant registry so
  *      /api/decision/stream can look it up by walletId.
  *
- * Returns the wallet id + address + on-chain balance + Gateway balance, so
- * the caller can prove every step happened against real chain state.
- *
- * Cost note: Arc Testnet charges gas in USDC, so the treasury seed has to
- * cover both the deposit amount and the gas for approve+deposit.
+ * No treasury transfer happens here. Users fund their own wallet, then prepare
+ * Gateway from that funded wallet.
  */
 import { NextResponse } from 'next/server'
-import type { Address } from 'viem'
+import { getAddress, type Address } from 'viem'
 import { getSession, persistSession } from '@/lib/session-store'
-import {
-  createUserWallet,
-  transferUsdcFromTreasury,
-  waitForUsdcBalance,
-} from '@/lib/circle'
+import { createUserWallet } from '@/lib/circle'
+import { readUsdcBalance } from '@/lib/chain'
 import { depositForParticipant, readGatewayAvailableBalance } from '@/lib/gateway'
-import { addParticipant } from '@/lib/participant-store'
+import { addParticipant, getParticipant } from '@/lib/participant-store'
 
 export const dynamic = 'force-dynamic'
 
 interface Body {
   sessionId?: string
-  treasuryUsdc?: string // decimal e.g. "1"
+  walletId?: string
+  address?: string
+  prepareGateway?: boolean
   gatewayUsdc?: string // decimal e.g. "0.05"
 }
 
-const PARTICIPANT_SEED_USDC = '1'
 const PARTICIPANT_GATEWAY_USDC = '0.05'
 
 export async function POST(req: Request): Promise<NextResponse> {
@@ -58,60 +51,67 @@ export async function POST(req: Request): Promise<NextResponse> {
         { status: 404 },
       )
     }
-    const treasuryUsdc = body.treasuryUsdc ?? PARTICIPANT_SEED_USDC
     const gatewayUsdc = body.gatewayUsdc ?? PARTICIPANT_GATEWAY_USDC
 
     stage = 'wallet-create'
-    const { walletId, address } = await createUserWallet()
+    const wallet =
+      body.walletId && body.address
+        ? {
+            walletId: body.walletId,
+            address: getAddress(body.address) as Address,
+          }
+        : await createUserWallet()
 
-    stage = 'treasury-transfer'
-    const { transactionId: treasuryTxId } = await transferUsdcFromTreasury(
-      address,
-      treasuryUsdc,
-    )
+    stage = 'read-wallet-balance'
+    const onChainBalance = await readUsdcBalance(wallet.address)
+    let approveTransactionId: string | undefined
+    let depositTransactionId: string | undefined
+    let gatewayDepositedUsdc: string | undefined
+    let gatewayBalance = await readGatewayAvailableBalance(wallet.address)
 
-    stage = 'wait-treasury-balance'
-    const treasuryBalance = await waitForUsdcBalance(address)
-
-    stage = 'gateway-deposit'
-    const { approveTransactionId, depositTransactionId, amountAtomic } =
-      await depositForParticipant({
-        walletId,
-        walletAddress: address,
+    if (body.prepareGateway) {
+      stage = 'gateway-deposit'
+      const deposit = await depositForParticipant({
+        walletId: wallet.walletId,
+        walletAddress: wallet.address,
         amountUsdc: gatewayUsdc,
       })
+      approveTransactionId = deposit.approveTransactionId
+      depositTransactionId = deposit.depositTransactionId
+      gatewayDepositedUsdc = gatewayUsdc
 
-    stage = 'wait-gateway-balance'
-    const gatewayBalance = await waitForGatewayBalance({
-      depositor: address,
-      atLeastAtomic: BigInt(amountAtomic),
-    })
+      stage = 'wait-gateway-balance'
+      gatewayBalance = await waitForGatewayBalance({
+        depositor: wallet.address,
+        atLeastAtomic: BigInt(deposit.amountAtomic),
+      })
+    }
 
     stage = 'store-participant'
+    const existingParticipant = getParticipant(session.id, wallet.walletId)
     addParticipant(session.id, {
-      walletId,
-      address,
-      treasuryFundedUsdc: treasuryUsdc,
-      gatewayDepositedUsdc: gatewayUsdc,
-      approveTransactionId,
-      depositTransactionId,
-      createdAt: Date.now(),
+      walletId: wallet.walletId,
+      address: wallet.address,
+      gatewayDepositedUsdc: gatewayDepositedUsdc ?? existingParticipant?.gatewayDepositedUsdc,
+      approveTransactionId: approveTransactionId ?? existingParticipant?.approveTransactionId,
+      depositTransactionId: depositTransactionId ?? existingParticipant?.depositTransactionId,
+      createdAt: existingParticipant?.createdAt ?? Date.now(),
     })
-    session.participants += 1
+    if (!existingParticipant) session.participants += 1
     persistSession(session)
 
     return NextResponse.json({
       sessionId: session.id,
       participant: {
-        walletId,
-        address,
-        treasuryFundedUsdc: treasuryUsdc,
-        gatewayDepositedUsdc: gatewayUsdc,
-        balanceOnChain: treasuryBalance.formatted,
-        balanceOnChainRaw: treasuryBalance.raw.toString(),
+        walletId: wallet.walletId,
+        address: wallet.address,
+        gatewayDepositedUsdc,
+        balanceOnChain: onChainBalance.formatted,
+        balanceOnChainRaw: onChainBalance.raw.toString(),
         gatewayAvailable: gatewayBalance.formatted,
         gatewayAvailableRaw: gatewayBalance.raw.toString(),
-        treasuryTransactionId: treasuryTxId,
+        gatewayReady: gatewayBalance.raw > 0n,
+        fundingRequired: onChainBalance.raw === 0n,
         approveTransactionId,
         depositTransactionId,
       },

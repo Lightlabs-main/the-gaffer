@@ -73,7 +73,7 @@ export async function fundWalletUSDC(address: Address): Promise<void> {
 }
 
 /**
- * Transfers `amount` USDC from the pre-funded treasury wallet to `toAddress`
+ * Transfers `amount` USDC from the configured treasury wallet to `toAddress`
  * on Arc Testnet. Returns the Circle transaction id (caller can poll the chain
  * for the resulting balance change).
  */

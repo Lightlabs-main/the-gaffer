@@ -1,20 +1,18 @@
 /**
  * POST /api/wallet/create
  *
- * Creates a fresh Arc Testnet custodial wallet via Circle, requests test USDC
- * from the Circle faucet, polls the chain for the funded balance, and returns
- * the real walletId + address + on-chain balance.
+ * Creates a fresh Arc Testnet custodial wallet via Circle and returns the
+ * real walletId + address + current on-chain balance.
  *
  * No mocks. No hardcoded values. The balance is read directly from the
  * Arc Testnet USDC contract.
  */
 import { NextResponse } from 'next/server'
-import { createUserWallet, transferUsdcFromTreasury, waitForUsdcBalance } from '@/lib/circle'
+import { createUserWallet } from '@/lib/circle'
+import { readUsdcBalance } from '@/lib/chain'
 
 // Force dynamic — this endpoint mutates external state.
 export const dynamic = 'force-dynamic'
-
-const LOGIN_SEED_USDC = '1'
 
 function detailErr(err: unknown): { stage: string; message: string; details: unknown } {
   // Circle SDK errors expose: message, code, errors[], status, response.data.
@@ -46,12 +44,8 @@ export async function POST(): Promise<NextResponse> {
     const { walletId, address } = await createUserWallet()
     console.log('[wallet/create] created', { walletId, address })
 
-    stage = 'fund'
-    const { transactionId } = await transferUsdcFromTreasury(address, LOGIN_SEED_USDC)
-    console.log('[wallet/create] treasury transfer initiated', { transactionId, to: address })
-
-    stage = 'wait-balance'
-    const balance = await waitForUsdcBalance(address)
+    stage = 'read-balance'
+    const balance = await readUsdcBalance(address)
     console.log('[wallet/create] on-chain balance', balance.formatted, 'USDC')
 
     return NextResponse.json({
@@ -59,9 +53,9 @@ export async function POST(): Promise<NextResponse> {
       address,
       balance: balance.formatted,
       balanceRaw: balance.raw.toString(),
-      fundingTransactionId: transactionId,
       chainId: 5042002,
       asset: 'USDC (Arc Testnet)',
+      fundingRequired: balance.raw === 0n,
     })
   } catch (err: unknown) {
     const info = detailErr(err)

@@ -20,14 +20,15 @@ export interface ProfileIdentity {
   address: string
   balance?: string
   balanceRaw?: string
-  fundingTransactionId?: string
   chainId?: number
   asset?: string
+  fundingRequired?: boolean
   createdAt: number
 }
 
 const PROFILE_KEY = 'gaffer_profile_matches'
 const PROFILE_IDENTITY_KEY = 'gaffer_profile_identity'
+const PROFILE_IDENTITIES_KEY = 'gaffer_profile_identities_by_email'
 
 export function hasProfileIdentity(): boolean {
   if (typeof window === 'undefined') return false
@@ -47,15 +48,41 @@ export function readProfileIdentity(): ProfileIdentity | null {
   }
 }
 
+export function readProfileIdentityByEmail(email: string): ProfileIdentity | null {
+  if (typeof window === 'undefined') return null
+  const key = email.trim().toLowerCase()
+  if (!key) return null
+  try {
+    const raw = window.localStorage.getItem(PROFILE_IDENTITIES_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Record<string, Partial<ProfileIdentity>>
+    const identity = parsed[key]
+    if (!identity?.email || !identity.walletId || !identity.address) return null
+    return identity as ProfileIdentity
+  } catch {
+    return null
+  }
+}
+
 export function saveProfileIdentity(identity: ProfileIdentity) {
   if (typeof window === 'undefined') return
   window.localStorage.setItem(PROFILE_IDENTITY_KEY, JSON.stringify(identity))
+  try {
+    const raw = window.localStorage.getItem(PROFILE_IDENTITIES_KEY)
+    const identities = raw ? JSON.parse(raw) as Record<string, ProfileIdentity> : {}
+    identities[identity.email.trim().toLowerCase()] = identity
+    window.localStorage.setItem(PROFILE_IDENTITIES_KEY, JSON.stringify(identities))
+  } catch {
+    window.localStorage.setItem(
+      PROFILE_IDENTITIES_KEY,
+      JSON.stringify({ [identity.email.trim().toLowerCase()]: identity }),
+    )
+  }
 }
 
 export function clearProfileIdentity() {
   if (typeof window === 'undefined') return
   window.localStorage.removeItem(PROFILE_IDENTITY_KEY)
-  window.localStorage.removeItem(PROFILE_KEY)
 }
 
 export function clearProfileMatches() {

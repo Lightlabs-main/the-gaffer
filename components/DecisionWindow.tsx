@@ -142,7 +142,7 @@ export default function DecisionWindow({
       </div>
       {!walletReady && (
         <div className="mt-2 text-center text-xs text-zinc-500">
-          Setting up your wallet - streaming will be enabled shortly...
+          Fund and prepare your wallet before streaming.
         </div>
       )}
       {streamError && (

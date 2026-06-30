@@ -12,7 +12,7 @@ import ProfilePanel from '@/components/ProfilePanel'
 import CreatorEarnings from '@/components/CreatorEarnings'
 import MatchStatusPanel from '@/components/MatchStatusPanel'
 import ProvenancePanel from '@/components/ProvenancePanel'
-import { upsertProfileMatch } from '@/lib/client-profile'
+import { readProfileIdentity, upsertProfileMatch } from '@/lib/client-profile'
 
 interface MatchEvent {
   id: string
@@ -108,6 +108,8 @@ export default function MatchRoom({ sessionId }: Props) {
     initialWallet?.walletId ?? null,
   )
   const [walletError, setWalletError] = useState<string | null>(null)
+  const [gatewayReady, setGatewayReady] = useState(false)
+  const [preparingGateway, setPreparingGateway] = useState(false)
   const [matchStarted, setMatchStarted] = useState(false)
   const [creatorWalletId, setCreatorWalletId] = useState<string | null>(null)
   const [copiedLink, setCopiedLink] = useState(false)
@@ -134,10 +136,16 @@ export default function MatchRoom({ sessionId }: Props) {
       try {
         setWalletError(null)
         if (!initialWallet) setWalletStatus('loading')
+        const profile = readProfileIdentity()
+        const existingWallet = profile ?? initialWallet
         const res = await fetch('/api/wallet/participant', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId }),
+          body: JSON.stringify({
+            sessionId,
+            walletId: existingWallet?.walletId,
+            address: existingWallet?.address,
+          }),
         })
         if (cancelled) return
         if (!res.ok) {
@@ -152,6 +160,7 @@ export default function MatchRoom({ sessionId }: Props) {
         localStorage.setItem(storageKey, JSON.stringify(wallet))
         setWalletId(wallet.walletId)
         setWalletAddress(wallet.address)
+        setGatewayReady(Boolean(data.participant.gatewayReady))
         setWalletStatus('ready')
         upsertProfileMatch({
           sessionId,
@@ -171,6 +180,40 @@ export default function MatchRoom({ sessionId }: Props) {
     void createWallet()
     return () => { cancelled = true }
   }, [sessionId, initialWallet, authVersion])
+
+  async function prepareGateway() {
+    if (!walletId || !walletAddress || preparingGateway) return
+    setPreparingGateway(true)
+    setWalletError(null)
+    try {
+      const res = await fetch('/api/wallet/participant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          walletId,
+          address: walletAddress,
+          prepareGateway: true,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(
+          data.message ||
+            data.error ||
+            (data.stage ? `Gateway preparation failed at ${data.stage}` : 'Gateway preparation failed'),
+        )
+      }
+      setGatewayReady(Boolean(data.participant.gatewayReady))
+      if (!data.participant.gatewayReady) {
+        setWalletError('Fund this wallet with Arc Testnet USDC before preparing Gateway.')
+      }
+    } catch (err: unknown) {
+      setWalletError(err instanceof Error ? err.message : 'Gateway preparation failed')
+    } finally {
+      setPreparingGateway(false)
+    }
+  }
 
   // Handle SSE events
   const syncCreatorProfile = useCallback((nextState: MatchState) => {
@@ -485,7 +528,7 @@ export default function MatchRoom({ sessionId }: Props) {
             decision={matchState.currentDecision}
             sessionId={sessionId}
             participantWalletId={walletId}
-            walletReady={walletStatus === 'ready'}
+            walletReady={walletStatus === 'ready' && gatewayReady}
           />
         )}
 
@@ -521,6 +564,9 @@ export default function MatchRoom({ sessionId }: Props) {
           status={walletStatus}
           totalEarned={matchState.totalEarned}
           error={walletError}
+          gatewayReady={gatewayReady}
+          preparingGateway={preparingGateway}
+          onPrepareGateway={prepareGateway}
         />
 
         {creatorWalletId && (

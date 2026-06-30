@@ -3,7 +3,7 @@
  *
  * Creates a fresh match session:
  *   1. Creates a real Circle custodial wallet for the session creator and
- *      funds it with 1 USDC from the treasury (same flow as /api/wallet/create).
+ *      reads its current Arc Testnet USDC balance.
  *   2. Builds a starting MatchState (home: "The Crowd FC", away configurable
  *      via body.awayTeamName, default "Algorithm United").
  *   3. Stores the session in the in-memory session store.
@@ -14,16 +14,14 @@
  */
 import { NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
-import { createUserWallet, transferUsdcFromTreasury } from '@/lib/circle'
-import { waitForUsdcBalance } from '@/lib/circle'
+import { createUserWallet } from '@/lib/circle'
+import { readUsdcBalance } from '@/lib/chain'
 import { setSession } from '@/lib/session-store'
 import type { MatchState, Session } from '@/lib/types'
 import { appendProvenance } from '@/lib/provenance'
 import { getExperienceFormat, type ExperienceType } from '@/lib/experience-formats'
 
 export const dynamic = 'force-dynamic'
-
-const CREATOR_SEED_USDC = '1'
 
 interface CreateBody {
   awayTeamName?: string
@@ -42,11 +40,8 @@ export async function POST(req: Request): Promise<NextResponse> {
     stage = 'wallet-create'
     const { walletId, address } = await createUserWallet()
 
-    stage = 'wallet-fund'
-    const { transactionId } = await transferUsdcFromTreasury(address, CREATOR_SEED_USDC)
-
-    stage = 'wait-balance'
-    const balance = await waitForUsdcBalance(address)
+    stage = 'read-balance'
+    const balance = await readUsdcBalance(address)
 
     stage = 'session-build'
     const sessionId = randomUUID()
@@ -85,18 +80,18 @@ export async function POST(req: Request): Promise<NextResponse> {
     appendProvenance(session, {
       category: 'session',
       title: 'Creator experience opened',
-      detail: `${format.label}: ${homeName} vs ${awayName} was created with a funded creator settlement wallet.`,
+      detail: `${format.label}: ${homeName} vs ${awayName} was created with a creator settlement wallet.`,
       data: {
         experienceType: format.id,
         experienceLabel: format.label,
         creatorWalletId: walletId,
         creatorAddress: address,
-        fundingTransactionId: transactionId,
+        balanceRaw: balance.raw.toString(),
       },
     })
     setSession(session)
 
-    console.log('[session/create] created', { sessionId, walletId, address, fundingTransactionId: transactionId })
+    console.log('[session/create] created', { sessionId, walletId, address })
 
     return NextResponse.json({
       sessionId,
@@ -105,7 +100,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         address,
         balance: balance.formatted,
         balanceRaw: balance.raw.toString(),
-        fundingTransactionId: transactionId,
+        fundingRequired: balance.raw === 0n,
       },
       matchState,
     })
