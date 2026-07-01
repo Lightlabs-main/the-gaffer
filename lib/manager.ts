@@ -29,6 +29,10 @@ export interface ManagerVerdict {
   requestId: string | null
   /** Wall-clock ms the API call took (round-trip). */
   latencyMs: number
+  confidence: EngineResult['confidence']
+  execution: string
+  risk: string
+  memory: string
 }
 
 /**
@@ -41,7 +45,8 @@ export async function produceManagerVerdict(opts: {
 }): Promise<ManagerVerdict> {
   const client = getAnthropicClient()
   const model = managerModel()
-  const { system, user } = buildPrompt(opts)
+  const plan = buildManagerPlan(opts)
+  const { system, user } = buildPrompt(opts, plan)
   const started = Date.now()
   const response = await client.messages.create({
     model,
@@ -69,6 +74,51 @@ export async function produceManagerVerdict(opts: {
     model: response.model,
     requestId: (response as { _request_id?: string | null })._request_id ?? null,
     latencyMs,
+    confidence: plan.confidence,
+    execution: plan.execution,
+    risk: plan.risk,
+    memory: plan.memory,
+  }
+}
+
+function buildManagerPlan(opts: {
+  matchState: MatchState
+  decision: DecisionWindow
+  engine: EngineResult
+}): Pick<ManagerVerdict, 'confidence' | 'execution' | 'risk' | 'memory'> {
+  const { matchState, decision, engine } = opts
+  const lastChoices = matchState.crowdChoices?.slice(-3) ?? []
+  const repeatedWide =
+    lastChoices.filter((choice) => /wide|flank|full-back/i.test(choice.winnerLabel)).length >= 2
+  const repeatedCentral =
+    lastChoices.filter((choice) => /central|middle|control/i.test(choice.winnerLabel)).length >= 2
+  const memory = lastChoices.length
+    ? lastChoices
+        .map(
+          (choice) =>
+            `${choice.minute}' ${choice.type}: ${choice.winnerLabel} (${choice.confidence})`,
+        )
+        .join('; ')
+    : 'No previous crowd choices in this match.'
+
+  let risk = 'Risk: balanced call; execution depends on the next transition.'
+  if (engine.confidence === 'narrow' || engine.confidence === 'divided') {
+    risk = 'Risk: the USDC signal is split, so the team may hesitate if the first action fails.'
+  } else if (engine.confidence === 'reversal') {
+    risk = 'Risk: the late reversal gives momentum, but the dressing room has to absorb the sudden switch.'
+  } else if (matchState.minute >= 70 && matchState.homeTeam.score <= matchState.awayTeam.score) {
+    risk = 'Risk: late aggression can win the match or leave the back line exposed.'
+  } else if (repeatedWide) {
+    risk = 'Risk: the opponent has seen repeated wide attacks and may drop the full-back deeper.'
+  } else if (repeatedCentral) {
+    risk = 'Risk: repeated central control can invite pressure on the first square pass.'
+  }
+
+  return {
+    confidence: engine.confidence,
+    execution: `Execute "${engine.winnerLabel}" from the ${decision.type} window.`,
+    risk,
+    memory,
   }
 }
 
@@ -76,11 +126,14 @@ export async function produceManagerVerdict(opts: {
  * Build the system + user prompts. Kept here (not in a separate file) so a
  * non-coder can see, in one place, exactly what context Claude receives.
  */
-function buildPrompt(opts: {
-  matchState: MatchState
-  decision: DecisionWindow
-  engine: EngineResult
-}): { system: string; user: string } {
+function buildPrompt(
+  opts: {
+    matchState: MatchState
+    decision: DecisionWindow
+    engine: EngineResult
+  },
+  plan: Pick<ManagerVerdict, 'confidence' | 'execution' | 'risk' | 'memory'>,
+): { system: string; user: string } {
   const { matchState, decision, engine } = opts
   const home = matchState.homeTeam
   const away = matchState.awayTeam
@@ -91,7 +144,9 @@ function buildPrompt(opts: {
     `You are the AI Manager of The Crowd FC, a virtual football club managed entirely by its supporters through live micropayments.`,
     `The crowd streams USDC toward decisions and you execute their will — but you are not a robot.`,
     `You are a football manager with tactical knowledge and a voice.`,
-    `You read the money signal the crowd sends you, announce the decision with conviction or hesitation depending on how clear the signal was, and flag the risk when the crowd is making a gamble.`,
+    `You read the USDC signal the crowd sends you, announce the decision with conviction or hesitation depending on how clear the signal was, and flag the risk when the crowd is making a gamble.`,
+    `You remember the crowd's previous choices and mention the pattern when it matters.`,
+    `You do more than narrate: read the winning USDC signal, decide confidence, execute the tactic, explain risk, and carry memory forward.`,
     `Keep responses under 60 words. Be direct. Occasionally be dramatic. Never be bland.`,
     `Tone mapping: if confidence is "decisive", speak with absolute conviction;`,
     `if "narrow", speak with hesitation and caution;`,
@@ -104,7 +159,7 @@ function buildPrompt(opts: {
   const optionBreakdown = engine.breakdown
     .map(
       (b) =>
-        `  - "${b.label}": ${(b.share * 100).toFixed(1)}% of the money (${b.total.toFixed(6)} USDC)`,
+        `  - "${b.label}": ${(b.share * 100).toFixed(1)}% of the settled USDC (${b.total.toFixed(6)} USDC)`,
     )
     .join('\n')
 
@@ -119,13 +174,17 @@ function buildPrompt(opts: {
     `  Options the crowd streamed toward:`,
     optionBreakdown,
     ``,
-    `Verdict from the money:`,
+    `Verdict from the USDC signal:`,
     `  Winner: "${engine.winnerLabel}"`,
     `  Confidence: ${engine.confidence} (${confidenceLine})`,
     `  Signal note: ${engine.signal}`,
     `  Total streamed this window: ${engine.totalStreamed.toFixed(6)} USDC across ${decision.options.length} options`,
+    `  Manager confidence decision: ${plan.confidence}`,
+    `  Tactical execution: ${plan.execution}`,
+    `  Risk to explain: ${plan.risk}`,
+    `  Crowd-choice memory: ${plan.memory}`,
     ``,
-    `Now: announce the call to your team on the touchline. Commit to "${engine.winnerLabel}". 2 to 4 sentences. Plain prose, no formatting.`,
+    `Now: announce the call to your team on the touchline. Commit to "${engine.winnerLabel}", mention the risk in plain football terms, and reference memory only if it changes the read. 2 to 4 sentences. Plain prose, no formatting.`,
   ].join('\n')
 
   return { system, user }

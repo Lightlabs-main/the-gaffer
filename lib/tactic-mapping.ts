@@ -86,21 +86,39 @@ function resolveFormation(n: string, original: string): TacticOutcome {
   if (n.includes('3-5-2')) return { kind: 'state', field: 'formation', value: '3-5-2' }
   if (n.includes('4-2-3-1')) return { kind: 'state', field: 'formation', value: '4-2-3-1' }
   if (n.includes('4-4-2')) return { kind: 'state', field: 'formation', value: '4-4-2' }
+  if (n.includes('left flank') || n.includes('wide') || n.includes('tempo')) {
+    return { kind: 'state', field: 'formation', value: '4-3-3' }
+  }
+  if (n.includes('central') || n.includes('middle') || n.includes('control')) {
+    return { kind: 'state', field: 'formation', value: '4-2-3-1' }
+  }
   return { kind: 'noop', reason: `formation verdict "${original}" did not match any known shape` }
 }
 
 function resolveMentality(n: string, original: string): TacticOutcome {
   if (n.includes('attack')) return { kind: 'state', field: 'mentality', value: 'attacking' }
+  if (n.includes('push') || n.includes('wide') || n.includes('tempo') || n.includes('hunting')) {
+    return { kind: 'state', field: 'mentality', value: 'attacking' }
+  }
   if (n.includes('defens')) return { kind: 'state', field: 'mentality', value: 'defensive' }
+  if (n.includes('protect') || n.includes('lock')) {
+    return { kind: 'state', field: 'mentality', value: 'defensive' }
+  }
   if (n.includes('balanc')) return { kind: 'state', field: 'mentality', value: 'balanced' }
+  if (n.includes('central') || n.includes('control')) return { kind: 'state', field: 'mentality', value: 'balanced' }
   return { kind: 'noop', reason: `mentality verdict "${original}" did not match` }
 }
 
 function resolvePressing(n: string, original: string): TacticOutcome {
   if (n.includes('high')) return { kind: 'state', field: 'pressing', value: 'high' }
+  if (n.includes('attack') || n.includes('push') || n.includes('tempo') || n.includes('hunting')) {
+    return { kind: 'state', field: 'pressing', value: 'high' }
+  }
   if (n.includes('sit off') || n.includes('low')) {
     return { kind: 'state', field: 'pressing', value: 'low' }
   }
+  if (n.includes('protect') || n.includes('lock')) return { kind: 'state', field: 'pressing', value: 'low' }
   if (n.includes('mid')) return { kind: 'state', field: 'pressing', value: 'mid' }
+  if (n.includes('central') || n.includes('control')) return { kind: 'state', field: 'pressing', value: 'mid' }
   return { kind: 'noop', reason: `pressing verdict "${original}" did not match` }
 }

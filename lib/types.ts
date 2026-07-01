@@ -53,6 +53,28 @@ export interface MatchEvent {
   isGoal?: boolean
 }
 
+export interface CrowdChoiceMemory {
+  windowId: string
+  minute: number
+  type: DecisionWindow['type']
+  winnerLabel: string
+  confidence: string
+  winnerShare: number
+  totalStreamed: number
+  risk: string
+  executed: string
+}
+
+export interface OpponentCoachState {
+  tendency: 'wide_attack' | 'central_control' | 'high_press' | 'protect_lead' | 'mixed'
+  reaction: string
+  tacticalShift: string
+  updatedAtMinute: number
+  wideAttackCount: number
+  centralControlCount: number
+  highPressCount: number
+}
+
 export interface MatchState {
   id: string
   experienceType: import('./experience-formats').ExperienceType
@@ -77,6 +99,8 @@ export interface MatchState {
   events: MatchEvent[]
   currentDecision?: DecisionWindow
   totalEarned: number
+  crowdChoices?: CrowdChoiceMemory[]
+  opponentCoach?: OpponentCoachState
 }
 
 export type ProvenanceCategory =

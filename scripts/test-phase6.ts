@@ -80,7 +80,7 @@ function engine(confidence: EngineResult['confidence']): EngineResult {
     signal:
       confidence === 'reversal'
         ? 'The defensive option led until a late attacking surge flipped the window.'
-        : `${(share * 100).toFixed(1)}% of the money chose attacking football.`,
+        : `${(share * 100).toFixed(1)}% of the USDC signal chose attacking football.`,
     breakdown: [
       {
         id: 'attack',

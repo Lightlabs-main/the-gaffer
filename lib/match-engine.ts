@@ -17,10 +17,10 @@ import { appendProvenance } from './provenance'
 import {
   WINDOW_MATCH_MINUTES,
   windowTypeForIndex,
-  buildDecisionWindow,
   WINDOW_OPEN_DURATION_MS,
 } from './window-catalog'
 import { simulateMatchSegment } from './match-simulator'
+import { buildScoutDecisionWindow } from './ai-scout'
 
 const MS_PER_MATCH_MINUTE = 20_000 // 90 min / 30 real min = 20s per match minute
 const HALF_TIME_PAUSE_MS = 15_000  // 15s real-time half-time break
@@ -203,7 +203,7 @@ class MatchEngine {
       this.windowIndex < WINDOW_MATCH_MINUTES.length
     ) {
       const type = windowTypeForIndex(this.windowIndex)
-      const window = buildDecisionWindow(type, Date.now())
+      const window = buildScoutDecisionWindow(ms, type, Date.now())
       openDecisionWindow(this.session, window)
       const currentWindowIndex = this.windowIndex
       this.windowIndex++

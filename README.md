@@ -1,8 +1,8 @@
 # The Gaffer
 
-**The crowd decides. Money is the steering wheel.**
+**The crowd decides. USDC is the steering wheel.**
 
-The Gaffer is a live virtual football match manager where spectators collectively control one team's tactics through USDC micropayments. Players hold a button to stream money toward their preferred tactical option — formation changes, pressing triggers, mentality shifts — and the option that attracts the most money wins. An AI manager (Claude) reads the crowd's financial signal, announces the decision in a football-manager voice, then simulates what happens next on the pitch. The simulation genuinely changes based on the tactic chosen.
+The Gaffer is a live virtual football match manager where spectators collectively control one team's tactics through USDC micropayments. Players hold a button to stream USDC to steer their preferred tactical option — formation changes, pressing triggers, mentality shifts — and the option that attracts the most settled USDC wins. An AI manager (Claude) reads the crowd's USDC signal, announces the decision in a football-manager voice, then simulates what happens next on the pitch. The simulation genuinely changes based on the tactic chosen, so the match log can show when USDC caused this tactical shift.
 
 Built for the **Lepton Agents Hackathon** (Canteen x Circle x Arc, June 2026).
 
@@ -29,9 +29,13 @@ Eight decision windows open during the match at minutes 10, 20, 30, 40, 55, 65, 
 | 7 | Push-or-Hold | "Late on, do we go again?" — Push for another vs Hold |
 | 8 | Formation | Back to formation decisions |
 
+### AI Scout
+
+Before each window opens, the AI Scout reads the live match state — score, minute, recent events, mentality, pressing, and formations — then proposes the next tactical decision window. For example: "Their left back is isolated" with Option A "Attack left flank" and Option B "Stay central." This keeps the USDC signal tied to the state of the match instead of a prewritten poll.
+
 ### Streaming Payments
 
-Each participant gets a custodial Circle wallet on signup — no MetaMask, no seed phrases, no Web3 knowledge required. Participants fund their own wallet with Arc Testnet USDC, prepare it for Circle Gateway, then holding a button streams **$0.0001 USDC per 500ms** toward the chosen option via x402. Taps are only recorded after successful settlement. The option that accumulates the most money wins.
+Each participant gets a custodial Circle wallet on signup — no MetaMask, no seed phrases, no Web3 knowledge required. Participants fund their own wallet with Arc Testnet USDC, prepare it for Circle Gateway, then holding a button streams **$0.0001 USDC per 500ms** toward the chosen option via x402. Taps are only recorded after successful settlement. The option that accumulates the most settled USDC wins.
 
 ### Crowd Confidence
 
@@ -46,7 +50,11 @@ The decision engine calculates how the crowd felt about the outcome:
 
 ### AI Manager
 
-Claude reads the money signal — not just who won, but *how clearly* the crowd spoke — and delivers a 2–4 sentence football-manager monologue. A decisive 80/20 split gets a confident team talk. A 52/48 split gets a frustrated manager questioning his players. A last-second reversal gets dramatic commentary about the crowd changing its mind.
+Claude reads the winning USDC signal — not just who won, but *how clearly* the crowd spoke — then commits to the tactic, explains the risk, and carries memory from past crowd choices. A decisive 80/20 split gets a confident team talk. A 52/48 split gets a risk-aware warning. If supporters repeatedly attack wide, that pattern is remembered in the next touchline call.
+
+### Opponent Coach
+
+The away side now has its own coach state. When the crowd keeps attacking wide, pressing high, or locking the middle, the opponent coach reacts before the next simulation segment. Example: repeated wide attacks make the opposing full-back drop deeper, and the simulator is told to reflect that adjustment in the next events.
 
 ### Match Simulation
 

@@ -33,6 +33,8 @@ export async function simulateMatchSegment(opts: {
   const { matchState, fromMinute, toMinute } = opts
   const home = matchState.homeTeam
   const away = matchState.awayTeam
+  const opponentCoach = matchState.opponentCoach
+  const crowdMemory = matchState.crowdChoices?.slice(-3) ?? []
 
   const recentEvents = matchState.events
     .slice(-5)
@@ -43,6 +45,18 @@ export async function simulateMatchSegment(opts: {
     `Simulate minutes ${fromMinute} to ${toMinute} of this football match.`,
     `Home: ${home.name} (${home.formation}, ${home.mentality} mentality, ${home.pressing} press), score ${home.score}.`,
     `Away: ${away.name} (${away.formation}), score ${away.score}.`,
+    `Crowd choice memory: ${
+      crowdMemory.length
+        ? crowdMemory
+            .map((choice) => `${choice.minute}' ${choice.winnerLabel} (${choice.confidence})`)
+            .join('; ')
+        : 'No previous crowd choices.'
+    }`,
+    `Opponent coach reaction: ${
+      opponentCoach
+        ? `${opponentCoach.reaction} ${opponentCoach.tacticalShift}`
+        : 'No opponent adjustment yet.'
+    }`,
     `Recent events: ${recentEvents || 'None yet — match just started.'}`,
     `Return ONLY a JSON array of match events: [{ minute, type, text, isGoal? }].`,
     `Types: goal, goal-conceded, chance, card, injury, commentary.`,
@@ -52,6 +66,7 @@ export async function simulateMatchSegment(opts: {
     `- The tactics MUST influence the events: attacking mentality + high press = more chances and goals;`,
     `  defensive mentality + low press = more blocks, interceptions, and commentary about shape.`,
     `- A 4-3-3 with attacking mentality should create more chances than a 5-3-2 with defensive mentality.`,
+    `- The opponent coach reaction MUST affect the next events: if the crowd repeatedly attacks wide, show the deeper full-back reducing or redirecting that threat; if the crowd presses high, show the opponent trying to play around it.`,
     `- Goals should be rare (at most 1 per simulation) and plausible given the tactical setup.`,
     `- Return raw JSON only — no markdown, no code fences, no explanation.`,
   ].join(' ')

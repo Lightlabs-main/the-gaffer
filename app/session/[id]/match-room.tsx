@@ -13,7 +13,9 @@ import ProfilePanel from '@/components/ProfilePanel'
 import CreatorEarnings from '@/components/CreatorEarnings'
 import MatchStatusPanel from '@/components/MatchStatusPanel'
 import ProvenancePanel from '@/components/ProvenancePanel'
+import AIScoutPanel from '@/components/AIScoutPanel'
 import { readProfileIdentity, upsertProfileMatch } from '@/lib/client-profile'
+import type { MatchState as SharedMatchState } from '@/lib/types'
 
 interface MatchEvent {
   id: string
@@ -528,6 +530,8 @@ export default function MatchRoom({ sessionId }: Props) {
           status={matchState.status}
           hasOpenDecision={Boolean(matchState.currentDecision?.isOpen)}
         />
+
+        <AIScoutPanel matchState={matchState as SharedMatchState} />
 
         {/* Manager Speech */}
         <ManagerSpeech speech={managerSpeech} speechKey={speechKey} />

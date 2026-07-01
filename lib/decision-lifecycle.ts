@@ -8,7 +8,7 @@
  *   - recordTap: append one tap to the per-window history and update the
  *     winning option's totalStreamed + streamingRate. The x402 stream
  *     endpoint is the live HTTP caller; tests should call the pure decision
- *     engine directly instead of injecting money-free taps through HTTP.
+ *     engine directly instead of injecting USDC-free taps through HTTP.
  *   - closeDecisionWindow: idempotent. Runs the engine, sets isOpen=false +
  *     result + signal, broadcasts `decision-closed`.
  *
@@ -16,12 +16,13 @@
  * the shared types so we don't have to mutate the spec's interfaces).
  */
 import { randomUUID } from 'node:crypto'
-import type { Session, DecisionWindow, MatchEvent, DecisionTap } from './types'
+import type { Session, DecisionWindow, MatchEvent, DecisionTap, CrowdChoiceMemory } from './types'
 import { broadcast } from './sse'
 import { decide, type EngineTap, type EngineResult } from './decision-engine'
 import { produceManagerVerdict } from './manager'
 import { resolveTactic } from './tactic-mapping'
 import { appendProvenance } from './provenance'
+import { updateOpponentCoach } from './opponent-coach'
 
 interface WindowState {
   windowId: string
@@ -59,7 +60,7 @@ function getPersistedTaps(
   }
 
   // Older in-memory sessions may have option totals but no serialized tap
-  // list. Preserve the money signal so close/replay does not default to zero.
+  // list. Preserve the USDC signal so close/replay does not default to zero.
   const rebuilt = decision.options
     .filter((option) => option.totalStreamed > 0)
     .map((option) => ({
@@ -282,17 +283,32 @@ async function runManagerForWindow(
       appliedTactic = { kind: 'noop', reason: tactic.reason }
     }
 
+    const memory = rememberCrowdChoice({
+      session,
+      decision,
+      engine,
+      risk: verdict.risk,
+      executed: tacticSummary(appliedTactic),
+    })
+    const opponentCoach = updateOpponentCoach(session.matchState, memory)
+
     appendProvenance(session, {
       category: 'manager',
       title: 'AI manager responded',
-      detail: tacticSummary(appliedTactic),
+      detail: `${tacticSummary(appliedTactic)} ${opponentCoach.tacticalShift}`,
       data: {
         windowId: decision.id,
         speech: verdict.speech,
         model: verdict.model,
         latencyMs: verdict.latencyMs,
         requestId: verdict.requestId,
+        confidence: verdict.confidence,
+        risk: verdict.risk,
+        memory: verdict.memory,
+        execution: verdict.execution,
         tactic: appliedTactic,
+        crowdChoice: memory,
+        opponentCoach,
       },
     })
 
@@ -304,6 +320,11 @@ async function runManagerForWindow(
       latencyMs: verdict.latencyMs,
       requestId: verdict.requestId,
       tactic: appliedTactic,
+      confidence: verdict.confidence,
+      risk: verdict.risk,
+      memory: verdict.memory,
+      execution: verdict.execution,
+      opponentCoach,
       serverTime: Date.now(),
     })
   } catch (err: unknown) {
@@ -316,6 +337,32 @@ async function runManagerForWindow(
       serverTime: Date.now(),
     })
   }
+}
+
+function rememberCrowdChoice(input: {
+  session: Session
+  decision: DecisionWindow
+  engine: EngineResult
+  risk: string
+  executed: string
+}): CrowdChoiceMemory {
+  const { session, decision, engine, risk, executed } = input
+  const memory: CrowdChoiceMemory = {
+    windowId: decision.id,
+    minute: session.matchState.minute,
+    type: decision.type,
+    winnerLabel: engine.winnerLabel,
+    confidence: engine.confidence,
+    winnerShare: engine.winnerShare,
+    totalStreamed: engine.totalStreamed,
+    risk,
+    executed,
+  }
+  session.matchState.crowdChoices = [
+    ...(session.matchState.crowdChoices ?? []),
+    memory,
+  ].slice(-12)
+  return memory
 }
 
 function tacticSummary(
