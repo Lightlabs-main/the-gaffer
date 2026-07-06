@@ -108,7 +108,10 @@ function saveAllToDisk(): void {
 
 async function readSessionIndex(): Promise<string[]> {
   try {
-    return (await kvGetJson<string[]>(SESSION_INDEX_KEY)) ?? []
+    const ids = (await kvGetJson<string[]>(SESSION_INDEX_KEY)) ?? []
+    if (ids.length) return ids
+    ensureLoadedFromDisk()
+    return Array.from(sessions.keys())
   } catch (err) {
     console.warn('[session-store] KV index read failed, falling back to local file', err)
     ensureLoadedFromDisk()
@@ -166,6 +169,7 @@ export function getCachedSession(id: string): Session | undefined {
 
 export async function setSession(session: Session): Promise<void> {
   sessions.set(session.id, session)
+  saveAllToDisk()
   try {
     await kvSetJson(sessionKey(session.id), serializeSession(session))
     const ids = await readSessionIndex()
@@ -182,6 +186,7 @@ export async function persistSession(session: Session): Promise<void> {
 
 export async function deleteSession(id: string): Promise<boolean> {
   const existed = sessions.delete(id)
+  saveAllToDisk()
   const ids = await readSessionIndex()
   await writeSessionIndex(ids.filter((sessionId) => sessionId !== id))
   return existed
