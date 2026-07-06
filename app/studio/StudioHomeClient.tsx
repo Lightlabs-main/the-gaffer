@@ -18,6 +18,7 @@ import {
   type ExperienceType,
   type RoomKind,
 } from '@/lib/experience-formats'
+import type { MatchState, ProvenanceEvent } from '@/lib/types'
 
 type StudioSection =
   | 'Overview'
@@ -58,6 +59,15 @@ interface CreatedRoom {
     walletId?: string
     address?: string
   }
+}
+
+interface SessionApiSummary {
+  id?: string
+  sessionId?: string
+  matchState: MatchState
+  participants: number
+  createdAt: number
+  provenanceEvents: ProvenanceEvent[]
 }
 
 export interface StudioRoomSummary {
@@ -112,6 +122,74 @@ const roomKindBySection: Partial<Record<StudioSection, RoomKind>> = {
   'Live video': 'live-video',
   Articles: 'article',
   'Story seeds': 'story-video',
+}
+
+function isSessionApiSummary(value: unknown): value is SessionApiSummary {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<SessionApiSummary>
+  return Boolean(
+    candidate.matchState &&
+      typeof candidate.createdAt === 'number' &&
+      Array.isArray(candidate.provenanceEvents),
+  )
+}
+
+function getEventDataString(
+  event: ProvenanceEvent,
+  key: string,
+): string | undefined {
+  const value = event.data?.[key]
+  return typeof value === 'string' ? value : undefined
+}
+
+function sessionBelongsToIdentity(
+  session: SessionApiSummary,
+  identity: ProfileIdentity | null,
+): boolean {
+  if (!identity) return true
+  const creatorEmail = session.provenanceEvents
+    .map((event) => getEventDataString(event, 'creatorEmail'))
+    .find(Boolean)
+  return Boolean(
+    session.matchState.creatorWalletId === identity.walletId ||
+      session.matchState.creatorAddress.toLowerCase() ===
+        identity.address.toLowerCase() ||
+      creatorEmail?.toLowerCase() === identity.email.toLowerCase(),
+  )
+}
+
+function roomFromSession(session: SessionApiSummary): StudioRoomSummary {
+  const id = session.id ?? session.sessionId ?? session.matchState.id
+  const txEvent = [...session.provenanceEvents]
+    .reverse()
+    .find((event) => event.data?.txHash || event.data?.transactionId)
+  return {
+    id,
+    roomKind: session.matchState.roomKind,
+    experienceType: session.matchState.experienceType,
+    label: session.matchState.experienceLabel,
+    title:
+      session.matchState.seedTitle ||
+      session.matchState.homeTeam.name ||
+      session.matchState.experienceLabel,
+    topic:
+      session.matchState.seedTopic ||
+      session.matchState.awayTeam.name ||
+      session.matchState.experienceSummary,
+    createdAt: session.createdAt,
+    accessPriceUsdc: session.matchState.accessPriceUsdc ?? '0.0001',
+    steerPriceUsdc: session.matchState.steerPriceUsdc ?? '0.0001',
+    totalEarned: session.matchState.totalEarned,
+    branches: session.matchState.branches?.length ?? 0,
+    creatorWalletId: session.matchState.creatorWalletId,
+    creatorAddress: session.matchState.creatorAddress,
+    lastTxHash:
+      typeof txEvent?.data?.txHash === 'string'
+        ? txEvent.data.txHash
+        : typeof txEvent?.data?.transactionId === 'string'
+          ? txEvent.data.transactionId
+          : undefined,
+  }
 }
 
 export default function StudioHomeClient({
@@ -174,7 +252,7 @@ function StudioHomeForm({
   const [steerPriceUsdc, setSteerPriceUsdc] = useState('0.0001')
   const [error, setError] = useState<string | null>(null)
   const [signedIn, setSignedIn] = useState(initialSignedIn)
-  const [rooms] = useState(initialRooms)
+  const [rooms, setRooms] = useState(initialRooms)
   const activeSection = initialSection
 
   const visibleFormats = useMemo(() => {
@@ -192,6 +270,35 @@ function StudioHomeForm({
     window.addEventListener('gaffer-auth-changed', refreshIdentity)
     return () => window.removeEventListener('gaffer-auth-changed', refreshIdentity)
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function refreshRooms() {
+      try {
+        const res = await fetch('/api/session', { cache: 'no-store' })
+        if (!res.ok) return
+        const data = (await res.json()) as unknown
+        if (!Array.isArray(data)) return
+        const identity = readProfileIdentity() ?? initialIdentity
+        const nextRooms = data
+          .filter((item): item is SessionApiSummary => isSessionApiSummary(item))
+          .filter((session) => sessionBelongsToIdentity(session, identity))
+          .sort((a, b) => b.createdAt - a.createdAt)
+          .map(roomFromSession)
+        if (!cancelled) setRooms(nextRooms)
+      } catch {
+        // Keep the server-rendered room list if the backend refresh fails.
+      }
+    }
+
+    refreshRooms()
+    window.addEventListener('gaffer-auth-changed', refreshRooms)
+    return () => {
+      cancelled = true
+      window.removeEventListener('gaffer-auth-changed', refreshRooms)
+    }
+  }, [initialIdentity])
 
   function chooseFormat(nextType: ExperienceType) {
     const nextFormat = getExperienceFormat(nextType)
