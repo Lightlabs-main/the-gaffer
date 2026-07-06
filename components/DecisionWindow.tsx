@@ -224,8 +224,19 @@ async function sendSteer(input: {
       }),
     })
     if (!res.ok) {
-      const data = await res.json().catch(() => ({}))
-      return data.reason || data.error || data.message || `Steer failed (${res.status})`
+      const contentType = res.headers.get('content-type') ?? ''
+      const data = contentType.includes('application/json')
+        ? await res.json().catch(() => ({}))
+        : {}
+      const text = contentType.includes('application/json')
+        ? ''
+        : await res.text().catch(() => '')
+      const message =
+        data.reason ||
+        data.error ||
+        data.message ||
+        (text.trim() ? text.trim().slice(0, 240) : null)
+      return message ? `Steer failed (${res.status}): ${message}` : `Steer failed (${res.status})`
     }
     return null
   } catch (err: unknown) {

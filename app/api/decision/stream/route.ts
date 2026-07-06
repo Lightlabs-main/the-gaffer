@@ -39,13 +39,17 @@ import { encodePaymentSignatureHeader, decodePaymentSignatureHeader } from '@x40
 import { x402ResourceServer, type FacilitatorClient } from '@x402/core/server'
 import { BatchEvmScheme } from '@circle-fin/x402-batching/client'
 import { GatewayEvmScheme } from '@circle-fin/x402-batching/server'
-import { parseUnits } from 'viem'
+import { getAddress, parseUnits } from 'viem'
 import type { Address } from 'viem'
 import { getCachedSession, getSession } from '@/lib/session-store'
 import { getParticipant } from '@/lib/participant-store'
 import { recordTap } from '@/lib/decision-lifecycle'
 import {
   ARC_TESTNET_NETWORK,
+  CIRCLE_BATCHING_NAME,
+  CIRCLE_BATCHING_VERSION,
+  GATEWAY_AUTH_VALIDITY_WINDOW_SECONDS,
+  TESTNET_GATEWAY_WALLET,
   buildBatchingPaymentRequirements,
   getBatchFacilitatorClient,
 } from '@/lib/gateway'
@@ -101,6 +105,11 @@ const x402Server = new x402ResourceServer(
     })
   })
   .onSettleFailure(async (context) => {
+    console.error('[decision/stream] x402 settle failure', {
+      nonce: paymentNonce(context.paymentPayload),
+      message: context.error.message,
+      requirements: context.requirements,
+    })
     deletePendingTap(context.paymentPayload)
   })
   .onVerifiedPaymentCanceled(async (context) => {
@@ -150,7 +159,12 @@ const protectedStreamPost = withX402<unknown>(
       price: (context) => `$${tapAmountFromContext(context)}`,
       network: ARC_TESTNET_NETWORK,
       payTo: (context) => payToFromContext(context),
-      maxTimeoutSeconds: 60,
+      maxTimeoutSeconds: GATEWAY_AUTH_VALIDITY_WINDOW_SECONDS,
+      extra: {
+        name: CIRCLE_BATCHING_NAME,
+        version: CIRCLE_BATCHING_VERSION,
+        verifyingContract: getAddress(TESTNET_GATEWAY_WALLET),
+      },
     },
     description: 'Stream one Gaffer supporter tap toward the selected option',
     mimeType: 'application/json',
@@ -166,6 +180,9 @@ const protectedStreamPost = withX402<unknown>(
       body: {
         error: 'x402 settlement failed',
         reason: settleResult.errorReason ?? settleResult.errorMessage ?? 'unknown',
+        details: settleResult.errorMessage ?? null,
+        transaction: settleResult.transaction ?? null,
+        network: settleResult.network ?? ARC_TESTNET_NETWORK,
       },
     }),
   },

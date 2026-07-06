@@ -17,17 +17,17 @@ export default function MatchStatusPanel({
   const isFinished = status === 'full-time'
 
   let title = 'Waiting for the first crowd decision'
-  let detail = 'Watch the match for now. At minute 10, a 30-second decision window opens and players can hold a button to stream USDC toward a tactic.'
+  let detail = 'Watch the match for now. At minute 10, a decision window opens and players can type an instruction, choose a side, and settle a 0.0001 USDC steer.'
 
   if (hasOpenDecision) {
     title = 'Decision window is live'
-    detail = 'Hold one of the two tactic buttons to stream real test USDC. The option with the most settled money wins.'
+    detail = 'Type an instruction for the AI manager, choose one of the two tactic cards, then settle one real Arc x402 steer.'
   } else if (isFinished) {
     title = 'Match closed'
     detail = 'The match is over. Creator earnings stay visible in the sidebar for withdrawal checks.'
   } else if (nextMinute) {
     title = `Next crowd decision opens at ${nextMinute}'`
-    detail = `${Math.max(0, nextMinute - minute)} match minutes to go. Voting controls appear automatically when the window opens.`
+    detail = `${Math.max(0, nextMinute - minute)} match minutes to go. Typed steering controls appear automatically when the window opens.`
   }
 
   return (

@@ -20,7 +20,10 @@
  *    standard x402 buyer model. Keeping the bridge in one place makes the
  *    "this is the surface area" review tractable for the non-coder owner.
  */
-import { BatchFacilitatorClient } from '@circle-fin/x402-batching/server'
+import {
+  BatchFacilitatorClient,
+  GATEWAY_AUTH_VALIDITY_WINDOW_SECONDS,
+} from '@circle-fin/x402-batching/server'
 import { randomBytes } from 'node:crypto'
 import type { Address, Hex } from 'viem'
 import { getAddress, parseUnits, formatUnits, maxUint256, pad } from 'viem'
@@ -42,6 +45,7 @@ export const TESTNET_GATEWAY_MINTER: Address = '0x0022222ABE238Cc2C7Bb1f21003F0a
  */
 export const CIRCLE_BATCHING_NAME = 'GatewayWalletBatched'
 export const CIRCLE_BATCHING_VERSION = '1'
+export { GATEWAY_AUTH_VALIDITY_WINDOW_SECONDS }
 
 /** CAIP-2 network string for Arc Testnet — what the facilitator keys settle by. */
 export const ARC_TESTNET_NETWORK = `eip155:${ARC_TESTNET_CHAIN_ID}` // 'eip155:5042002'
@@ -480,7 +484,7 @@ export function buildBatchingPaymentRequirements(opts: {
     asset: ARC_TESTNET_USDC_ADDRESS,
     amount: opts.amountAtomic,
     payTo: getAddress(opts.payTo),
-    maxTimeoutSeconds: 60,
+    maxTimeoutSeconds: GATEWAY_AUTH_VALIDITY_WINDOW_SECONDS,
     extra: {
       name: CIRCLE_BATCHING_NAME,
       version: CIRCLE_BATCHING_VERSION,
