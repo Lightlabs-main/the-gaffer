@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
+import CircleAccountPanel from './CircleAccountPanel'
 import ProvenancePanel from './ProvenancePanel'
 import type { MatchState, MediaBranch, ProvenanceEvent } from '@/lib/types'
 
@@ -145,6 +146,7 @@ export default function MediaRoom({
         </section>
 
         <aside className="flex flex-col gap-4">
+          {walletStatus !== 'ready' || !walletAddress ? <CircleAccountPanel /> : null}
           <RoomAccessPanel
             address={walletAddress}
             error={walletError}
