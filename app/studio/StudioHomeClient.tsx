@@ -134,30 +134,6 @@ function isSessionApiSummary(value: unknown): value is SessionApiSummary {
   )
 }
 
-function getEventDataString(
-  event: ProvenanceEvent,
-  key: string,
-): string | undefined {
-  const value = event.data?.[key]
-  return typeof value === 'string' ? value : undefined
-}
-
-function sessionBelongsToIdentity(
-  session: SessionApiSummary,
-  identity: ProfileIdentity | null,
-): boolean {
-  if (!identity) return true
-  const creatorEmail = session.provenanceEvents
-    .map((event) => getEventDataString(event, 'creatorEmail'))
-    .find(Boolean)
-  return Boolean(
-    session.matchState.creatorWalletId === identity.walletId ||
-      session.matchState.creatorAddress.toLowerCase() ===
-        identity.address.toLowerCase() ||
-      creatorEmail?.toLowerCase() === identity.email.toLowerCase(),
-  )
-}
-
 function roomFromSession(session: SessionApiSummary): StudioRoomSummary {
   const id = session.id ?? session.sessionId ?? session.matchState.id
   const txEvent = [...session.provenanceEvents]
@@ -280,10 +256,8 @@ function StudioHomeForm({
         if (!res.ok) return
         const data = (await res.json()) as unknown
         if (!Array.isArray(data)) return
-        const identity = readProfileIdentity() ?? initialIdentity
         const nextRooms = data
           .filter((item): item is SessionApiSummary => isSessionApiSummary(item))
-          .filter((session) => sessionBelongsToIdentity(session, identity))
           .sort((a, b) => b.createdAt - a.createdAt)
           .map(roomFromSession)
         if (!cancelled) setRooms(nextRooms)

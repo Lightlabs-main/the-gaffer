@@ -59,6 +59,8 @@ export default function MatchRoom({ sessionId, initialSession = null }: Props) {
   )
   const [authVersion, setAuthVersion] = useState(0)
   const [signedIn, setSignedIn] = useState(false)
+  const [openingDecision, setOpeningDecision] = useState(false)
+  const [decisionOpenError, setDecisionOpenError] = useState<string | null>(null)
   const eventSourceRef = useRef<EventSource | null>(null)
 
   useEffect(() => {
@@ -335,6 +337,35 @@ export default function MatchRoom({ sessionId, initialSession = null }: Props) {
     window.setTimeout(() => setCopiedLink(false), 1500)
   }
 
+  async function openSteeringWindow() {
+    if (!matchState || matchState.status === 'full-time' || openingDecision) return
+    setOpeningDecision(true)
+    setDecisionOpenError(null)
+    try {
+      const res = await fetch('/api/decision/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          durationMs: 45_000,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || data.message || 'Could not open steering window')
+      }
+      setMatchState((prev) =>
+        prev ? { ...prev, currentDecision: data.window } : prev,
+      )
+    } catch (err) {
+      setDecisionOpenError(
+        err instanceof Error ? err.message : 'Could not open steering window',
+      )
+    } finally {
+      setOpeningDecision(false)
+    }
+  }
+
   // Connect to SSE
   useEffect(() => {
     let cancelled = false
@@ -549,13 +580,49 @@ export default function MatchRoom({ sessionId, initialSession = null }: Props) {
         <ManagerSpeech speech={managerSpeech} speechKey={speechKey} />
 
         {/* Decision Window */}
-        {matchState.currentDecision && (
+        {matchState.currentDecision?.isOpen ? (
           <DecisionWindow
             decision={matchState.currentDecision}
             sessionId={sessionId}
             participantWalletId={walletId}
             walletReady={walletStatus === 'ready' && gatewayReady}
           />
+        ) : (
+          <section className="live-card w-full p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-400">
+                  Paid steering
+                </p>
+                <h2 className="mt-1 text-lg font-semibold text-white">
+                  Open a live USDC decision window
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
+                  Click this during a demo to create a 45-second steering window.
+                  Players then hold one of the tactic buttons to stream USDC toward
+                  the next manager decision.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={openSteeringWindow}
+                disabled={openingDecision || matchState.status === 'full-time'}
+                className="rounded-xl bg-[var(--bar-b)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {openingDecision ? 'Opening...' : 'Open paid steering'}
+              </button>
+            </div>
+            {walletStatus !== 'ready' || !gatewayReady ? (
+              <p className="mt-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-100">
+                Login and prepare/fund the wallet before holding a steering button.
+              </p>
+            ) : null}
+            {decisionOpenError && (
+              <p className="mt-3 rounded-lg border border-red-500/30 bg-red-950/40 px-3 py-2 text-xs text-red-200">
+                {decisionOpenError}
+              </p>
+            )}
+          </section>
         )}
 
         {/* Match Commentary */}

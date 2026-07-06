@@ -2,7 +2,6 @@ import { cookies } from 'next/headers'
 import StudioHomeClient, { type StudioRoomSummary } from './StudioHomeClient'
 import type { ProfileIdentity } from '@/lib/client-profile'
 import { listSessions } from '@/lib/session-store'
-import type { ProvenanceEvent, Session } from '@/lib/types'
 
 function parseProfileIdentityCookie(value?: string): ProfileIdentity | null {
   if (!value) return null
@@ -13,30 +12,6 @@ function parseProfileIdentityCookie(value?: string): ProfileIdentity | null {
   } catch {
     return null
   }
-}
-
-function getEventDataString(
-  event: ProvenanceEvent,
-  key: string,
-): string | undefined {
-  const value = event.data?.[key]
-  return typeof value === 'string' ? value : undefined
-}
-
-function sessionBelongsToIdentity(
-  session: Session,
-  identity: ProfileIdentity | null,
-): boolean {
-  if (!identity) return true
-  const creatorEmail = session.provenanceEvents
-    .map((event) => getEventDataString(event, 'creatorEmail'))
-    .find(Boolean)
-  return Boolean(
-    session.matchState.creatorWalletId === identity.walletId ||
-      session.matchState.creatorAddress.toLowerCase() ===
-        identity.address.toLowerCase() ||
-      creatorEmail?.toLowerCase() === identity.email.toLowerCase(),
-  )
 }
 
 export default async function StudioHome({
@@ -54,7 +29,6 @@ export default async function StudioHome({
   )
   const initialSignedIn = Boolean(identity?.loginProvider === 'email')
   const initialRooms: StudioRoomSummary[] = (await listSessions())
-    .filter((session) => sessionBelongsToIdentity(session, identity))
     .sort((a, b) => b.createdAt - a.createdAt)
     .map((session) => {
       const txEvent = [...session.provenanceEvents]
