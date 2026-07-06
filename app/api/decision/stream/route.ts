@@ -19,7 +19,7 @@
  *      our adapter that signs EIP-712 TransferWithAuthorization via Circle's
  *      `signTypedData` API instead of an in-process private key.
  *   4. `createPaymentPayload(...)` produces the signed payload, encoded as
- *      the X-Payment header for the protected request.
+ *      the PAYMENT-SIGNATURE header for the protected request.
  *   5. `withX402(...)` verifies and settles the payment through the Circle
  *      Gateway facilitator.
  *   6. Only the server's `onAfterSettle` hook calls `recordTap()`, which
@@ -301,7 +301,8 @@ function buildInternalX402Request(
 
   const headers = new Headers(req.headers)
   headers.set('content-type', 'application/json')
-  headers.set('x-payment', paymentHeader)
+  headers.set('payment-signature', paymentHeader)
+  headers.delete('x-payment')
   headers.delete('content-length')
 
   return new NextRequest(url.toString(), {
