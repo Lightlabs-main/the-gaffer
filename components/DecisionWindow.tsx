@@ -1,7 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
-import StreamingBar from './StreamingBar'
+import { useEffect, useMemo, useState } from 'react'
 
 interface DecisionOption {
   id: string
@@ -24,6 +23,9 @@ interface Props {
   sessionId: string
   participantWalletId: string | null
   walletReady: boolean
+  gatewayReady: boolean
+  preparingGateway?: boolean
+  onPrepareGateway?: () => void
 }
 
 export default function DecisionWindow({
@@ -31,13 +33,16 @@ export default function DecisionWindow({
   sessionId,
   participantWalletId,
   walletReady,
+  gatewayReady,
+  preparingGateway = false,
+  onPrepareGateway,
 }: Props) {
   const [secondsLeft, setSecondsLeft] = useState(0)
-  const [streamingOptionId, setStreamingOptionId] = useState<string | null>(null)
+  const [steerText, setSteerText] = useState('')
+  const [settlingOptionId, setSettlingOptionId] = useState<string | null>(null)
   const [streamError, setStreamError] = useState<string | null>(null)
-  const streamIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [streamSuccess, setStreamSuccess] = useState<string | null>(null)
 
-  // Countdown timer
   useEffect(() => {
     if (!decision || !decision.isOpen) {
       const clearTimer = window.setTimeout(() => setSecondsLeft(0), 0)
@@ -52,125 +57,178 @@ export default function DecisionWindow({
     return () => clearInterval(timer)
   }, [decision])
 
-  const stopStreaming = useCallback(() => {
-    if (streamIntervalRef.current) {
-      clearInterval(streamIntervalRef.current)
-      streamIntervalRef.current = null
-    }
-    setStreamingOptionId(null)
-  }, [])
-
-  const startStreaming = useCallback(
-    (optionId: string) => {
-      if (!participantWalletId || !walletReady || !decision?.isOpen) return
-      stopStreaming()
-      setStreamError(null)
-      setStreamingOptionId(optionId)
-
-      // Send a tap immediately
-      void sendTap(sessionId, optionId, participantWalletId).then((error) => {
-        if (error) {
-          setStreamError(error)
-          stopStreaming()
-        }
-      })
-
-      // Then every 500ms while holding
-      streamIntervalRef.current = setInterval(() => {
-        if (!decision.isOpen) {
-          stopStreaming()
-          return
-        }
-        void sendTap(sessionId, optionId, participantWalletId).then((error) => {
-          if (error) {
-            setStreamError(error)
-            stopStreaming()
-          }
-        })
-      }, 500)
-    },
-    [participantWalletId, walletReady, decision, sessionId, stopStreaming],
+  const totalAll = useMemo(
+    () => decision?.options.reduce((sum, option) => sum + option.totalStreamed, 0) ?? 0,
+    [decision],
   )
 
-  // Clean up on unmount or decision close
-  useEffect(() => {
-    if (!decision?.isOpen) {
-      const timer = window.setTimeout(stopStreaming, 0)
-      return () => window.clearTimeout(timer)
-    }
-    return stopStreaming
-  }, [decision?.isOpen, stopStreaming])
-
   if (!decision) return null
-
-  const totalAll = decision.options.reduce((s, o) => s + o.totalStreamed, 0)
 
   if (!decision.isOpen) {
     return (
       <div className="match-panel w-full p-4 text-center text-sm text-zinc-500">
-        Window closed - waiting for the gaffer...
+        Decision window closed. Open paid steering when you want the next crowd signal.
       </div>
     )
   }
 
+  const canSettle = Boolean(walletReady && gatewayReady && participantWalletId)
+
+  async function submitSteer(optionId: string) {
+    if (!participantWalletId || !canSettle) return
+    setSettlingOptionId(optionId)
+    setStreamError(null)
+    setStreamSuccess(null)
+    const error = await sendSteer({
+      sessionId,
+      optionId,
+      participantWalletId,
+      note: steerText,
+    })
+    if (error) {
+      setStreamError(error)
+    } else {
+      setStreamSuccess('0.0001 USDC steer settled and recorded in provenance.')
+    }
+    setSettlingOptionId(null)
+  }
+
   return (
-    <div className="live-card w-full p-5">
-      <div className="mb-1 flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-400">
-          {decision.type}
-        </span>
-        <span className="font-mono text-sm font-semibold text-[var(--accent)]">
+    <section className="live-card w-full p-5">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent)]">
+            Paid steering window
+          </span>
+          <h2 className="mt-2 text-xl font-semibold text-white">{decision.prompt}</h2>
+          <p className="mt-1 text-sm text-zinc-400">
+            Type your instruction, choose a side, then settle one Arc x402 steer.
+          </p>
+        </div>
+        <span className="rounded-full border border-red-400/40 px-3 py-1 font-mono text-sm font-semibold text-[var(--accent)]">
           {secondsLeft}s
         </span>
       </div>
-      <div className="mb-4 text-lg font-semibold text-white">{decision.prompt}</div>
-      <div className="flex flex-col gap-3">
-        {decision.options.map((opt, i) => (
-          <StreamingBar
-            key={opt.id}
-            label={opt.label}
-            description={opt.description}
-            totalStreamed={opt.totalStreamed}
-            percentage={totalAll > 0 ? (opt.totalStreamed / totalAll) * 100 : 50}
-            color={i === 0 ? 'var(--bar-a)' : 'var(--bar-b)'}
-            isStreaming={streamingOptionId === opt.id}
-            onHoldStart={() => startStreaming(opt.id)}
-            onHoldEnd={stopStreaming}
-            disabled={!walletReady || !participantWalletId}
-          />
-        ))}
+
+      <label className="block">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-400">
+          Your instruction to the AI manager
+        </span>
+        <textarea
+          value={steerText}
+          onChange={(event) => setSteerText(event.target.value)}
+          rows={3}
+          maxLength={360}
+          placeholder="Example: switch to 4-3-3, overload the left flank, and press earlier for the next five minutes."
+          className="mt-2 w-full resize-none rounded-sm border border-zinc-700 bg-zinc-950/70 px-4 py-3 text-sm leading-6 text-white outline-none transition focus:border-[var(--accent)]"
+        />
+      </label>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        {decision.options.map((option, index) => {
+          const percentage = totalAll > 0 ? (option.totalStreamed / totalAll) * 100 : 50
+          const isBusy = settlingOptionId === option.id
+          return (
+            <article
+              key={option.id}
+              className="rounded-sm border border-zinc-700 bg-zinc-950/50 p-4"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="grid h-7 w-7 place-items-center rounded-sm bg-[var(--accent)] text-xs font-bold text-black">
+                      {index === 0 ? 'A' : 'B'}
+                    </span>
+                    <h3 className="font-semibold text-white">{option.label}</h3>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-zinc-400">
+                    {option.description}
+                  </p>
+                </div>
+                <div className="text-right font-mono text-xs text-zinc-400">
+                  <div>{option.totalStreamed.toFixed(4)} USDC</div>
+                  <div>{percentage.toFixed(0)}%</div>
+                </div>
+              </div>
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-800">
+                <div
+                  className="h-full bg-[var(--accent)] transition-all"
+                  style={{ width: `${Math.max(4, percentage)}%` }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => submitSteer(option.id)}
+                disabled={!canSettle || isBusy}
+                className="mt-4 w-full rounded-sm bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
+              >
+                {isBusy ? 'Settling on Arc...' : 'Settle 0.0001 USDC steer'}
+              </button>
+            </article>
+          )
+        })}
       </div>
+
       {!walletReady && (
-        <div className="mt-2 text-center text-xs text-zinc-500">
-          Fund and prepare your wallet before streaming.
+        <p className="mt-3 rounded-sm border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-100">
+          Login first so Gaffer can attach your Circle Arc wallet to this room.
+        </p>
+      )}
+      {walletReady && !gatewayReady && (
+        <div className="mt-3 rounded-sm border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm text-yellow-100">
+          <p>
+            Your wallet is funded. Prepare it once for x402 streaming, then each
+            steer will settle as a real Arc payment.
+          </p>
+          {onPrepareGateway && (
+            <button
+              type="button"
+              onClick={onPrepareGateway}
+              disabled={preparingGateway}
+              className="mt-3 rounded-sm bg-white px-4 py-2 text-sm font-semibold text-black disabled:cursor-wait disabled:opacity-60"
+            >
+              {preparingGateway ? 'Preparing x402 streaming...' : 'Prepare wallet for x402 streaming'}
+            </button>
+          )}
         </div>
+      )}
+      {streamSuccess && (
+        <p className="mt-3 rounded-sm border border-emerald-500/30 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-100">
+          {streamSuccess}
+        </p>
       )}
       {streamError && (
-        <div className="mt-2 rounded-lg border border-red-500/30 bg-red-950/40 px-3 py-2 text-xs text-red-200">
+        <p className="mt-3 rounded-sm border border-red-500/30 bg-red-950/40 px-3 py-2 text-sm text-red-200">
           {streamError}
-        </div>
+        </p>
       )}
-    </div>
+    </section>
   )
 }
 
-async function sendTap(
-  sessionId: string,
-  optionId: string,
-  participantWalletId: string,
-): Promise<string | null> {
+async function sendSteer(input: {
+  sessionId: string
+  optionId: string
+  participantWalletId: string
+  note: string
+}): Promise<string | null> {
   try {
     const res = await fetch('/api/decision/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId, optionId, participantWalletId }),
+      body: JSON.stringify({
+        sessionId: input.sessionId,
+        optionId: input.optionId,
+        participantWalletId: input.participantWalletId,
+        note: input.note.trim() || undefined,
+      }),
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      return data.error || data.message || `Stream failed (${res.status})`
+      return data.reason || data.error || data.message || `Steer failed (${res.status})`
     }
     return null
   } catch (err: unknown) {
-    return err instanceof Error ? err.message : 'Stream failed'
+    return err instanceof Error ? err.message : 'Steer failed'
   }
 }

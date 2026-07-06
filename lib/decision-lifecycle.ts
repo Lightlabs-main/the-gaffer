@@ -117,6 +117,7 @@ export interface TapInput {
   optionId: string
   amount: number // USDC (decimal, e.g. 0.0001)
   ts?: number
+  note?: string
 }
 
 export function recordTap(session: Session, input: TapInput): {
@@ -138,7 +139,13 @@ export function recordTap(session: Session, input: TapInput): {
   }
   const state = ensureWindowState(session.id, decision.id)
   if (!decision.taps) decision.taps = state.taps
-  const tap = { optionId: input.optionId, amount: input.amount, ts: now }
+  const note = input.note?.trim()
+  const tap = {
+    optionId: input.optionId,
+    amount: input.amount,
+    ts: now,
+    ...(note ? { note } : {}),
+  }
   state.taps.push(tap)
   if (decision.taps !== state.taps) decision.taps.push(tap)
 
@@ -156,12 +163,15 @@ export function recordTap(session: Session, input: TapInput): {
   appendProvenance(session, {
     category: 'stream',
     title: 'USDC stream counted',
-    detail: `${input.amount.toFixed(6)} USDC moved toward "${option.label}".`,
+    detail: note
+      ? `${input.amount.toFixed(6)} USDC moved toward "${option.label}": ${note}`
+      : `${input.amount.toFixed(6)} USDC moved toward "${option.label}".`,
     data: {
       windowId: decision.id,
       optionId: input.optionId,
       optionLabel: option.label,
       amountUsdc: input.amount,
+      ...(note ? { supporterNote: note } : {}),
       totalForOption: option.totalStreamed,
       totalEarned: session.matchState.totalEarned,
     },

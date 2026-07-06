@@ -574,18 +574,16 @@ export default function MatchRoom({ sessionId, initialSession = null }: Props) {
           hasOpenDecision={Boolean(matchState.currentDecision?.isOpen)}
         />
 
-        <AIScoutPanel matchState={matchState} />
-
-        {/* Manager Speech */}
-        <ManagerSpeech speech={managerSpeech} speechKey={speechKey} />
-
         {/* Decision Window */}
         {matchState.currentDecision?.isOpen ? (
           <DecisionWindow
             decision={matchState.currentDecision}
             sessionId={sessionId}
             participantWalletId={walletId}
-            walletReady={walletStatus === 'ready' && gatewayReady}
+            walletReady={walletStatus === 'ready'}
+            gatewayReady={gatewayReady}
+            preparingGateway={preparingGateway}
+            onPrepareGateway={prepareGateway}
           />
         ) : (
           <section className="live-card w-full p-5">
@@ -599,8 +597,8 @@ export default function MatchRoom({ sessionId, initialSession = null }: Props) {
                 </h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
                   Click this during a demo to create a 45-second steering window.
-                  Players then hold one of the tactic buttons to stream USDC toward
-                  the next manager decision.
+                  Players then type an instruction and settle a 0.0001 USDC steer
+                  toward the next manager decision.
                 </p>
               </div>
               <button
@@ -612,9 +610,9 @@ export default function MatchRoom({ sessionId, initialSession = null }: Props) {
                 {openingDecision ? 'Opening...' : 'Open paid steering'}
               </button>
             </div>
-            {walletStatus !== 'ready' || !gatewayReady ? (
+            {walletStatus !== 'ready' ? (
               <p className="mt-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-100">
-                Login and prepare/fund the wallet before holding a steering button.
+                Login first so Gaffer can attach your Circle Arc wallet to this room.
               </p>
             ) : null}
             {decisionOpenError && (
@@ -624,6 +622,11 @@ export default function MatchRoom({ sessionId, initialSession = null }: Props) {
             )}
           </section>
         )}
+
+        <AIScoutPanel matchState={matchState} />
+
+        {/* Manager Speech */}
+        <ManagerSpeech speech={managerSpeech} speechKey={speechKey} />
 
         {/* Match Commentary */}
         <MatchCommentary events={matchState.events} />

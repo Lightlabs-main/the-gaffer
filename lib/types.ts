@@ -16,6 +16,7 @@ export interface DecisionTap {
   optionId: string
   amount: number
   ts: number
+  note?: string
 }
 
 export interface DecisionWindow {

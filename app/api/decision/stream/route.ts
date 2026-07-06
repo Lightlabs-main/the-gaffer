@@ -58,6 +58,7 @@ interface Body {
   optionId?: string
   participantWalletId?: string
   amountUsdc?: string // decimal, default "0.0001"
+  note?: string
 }
 
 const X402_VERSION = 1
@@ -71,6 +72,7 @@ interface PreparedTap {
   amountUsdc: string
   amountAtomic: string
   payTo: Address
+  note?: string
 }
 
 const pendingTapsByNonce = new Map<string, PreparedTap>()
@@ -95,6 +97,7 @@ const x402Server = new x402ResourceServer(
     recordTap(session, {
       optionId: pending.optionId,
       amount: amountFromSettlement,
+      note: pending.note,
     })
   })
   .onSettleFailure(async (context) => {
@@ -282,6 +285,7 @@ async function prepareTap(req: NextRequest, body: Body): Promise<PreparedTap> {
     amountUsdc,
     amountAtomic,
     payTo: session.matchState.creatorAddress as Address,
+    note: body.note?.trim() || undefined,
   }
 }
 
