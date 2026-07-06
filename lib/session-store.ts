@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import type { Session } from './types'
 import { normalizeUsdc } from './money'
 import { kvGetJson, kvSetJson } from './persistent-kv'
+import { env } from './env'
 
 type PersistedSession = Omit<Session, 'sseClients'> & {
   sseClients?: never
@@ -15,6 +16,13 @@ const SESSION_KEY_PREFIX = 'gaffer:session:'
 
 const sessions = new Map<string, Session>()
 let loadedFromDisk = false
+
+function backendOrigin(): string | undefined {
+  const origin = env.optionalBackendOrigin()?.replace(/\/+$/, '')
+  const appUrl = env.appUrl().replace(/\/+$/, '')
+  if (!origin || origin === appUrl) return undefined
+  return origin
+}
 
 function sessionKey(id: string): string {
   return `${SESSION_KEY_PREFIX}${id}`
@@ -40,6 +48,34 @@ function serializeSession(session: Session): PersistedSession {
     createdAt: session.createdAt,
     provenanceEvents: session.provenanceEvents,
   }
+}
+
+async function fetchBackendJson<T>(path: string): Promise<T | null> {
+  const origin = backendOrigin()
+  if (!origin) return null
+  const res = await fetch(`${origin}${path}`, { cache: 'no-store' })
+  if (res.status === 404) return null
+  if (!res.ok) {
+    throw new Error(`Backend ${path} failed with HTTP ${res.status}`)
+  }
+  return (await res.json()) as T
+}
+
+function sessionFromApi(data: {
+  sessionId?: string
+  id?: string
+  matchState: PersistedSession['matchState']
+  participants: number
+  createdAt: number
+  provenanceEvents: PersistedSession['provenanceEvents']
+}): Session {
+  return hydrateSession({
+    id: data.id ?? data.sessionId ?? data.matchState.id,
+    matchState: data.matchState,
+    participants: data.participants,
+    createdAt: data.createdAt,
+    provenanceEvents: data.provenanceEvents,
+  })
 }
 
 function ensureLoadedFromDisk(): void {
@@ -90,6 +126,15 @@ async function writeSessionIndex(ids: string[]): Promise<void> {
 }
 
 export async function getSession(id: string): Promise<Session | undefined> {
+  const backendSession = await fetchBackendJson<{
+    sessionId: string
+    matchState: PersistedSession['matchState']
+    participants: number
+    createdAt: number
+    provenanceEvents: PersistedSession['provenanceEvents']
+  }>(`/api/session/${encodeURIComponent(id)}`)
+  if (backendSession) return sessionFromApi(backendSession)
+
   const cached = sessions.get(id)
   if (cached) {
     cached.matchState.totalEarned = normalizeUsdc(cached.matchState.totalEarned)
@@ -143,6 +188,17 @@ export async function deleteSession(id: string): Promise<boolean> {
 }
 
 export async function listSessions(): Promise<Session[]> {
+  const backendSessions = await fetchBackendJson<
+    Array<{
+      id: string
+      matchState: PersistedSession['matchState']
+      participants: number
+      createdAt: number
+      provenanceEvents: PersistedSession['provenanceEvents']
+    }>
+  >('/api/session')
+  if (backendSessions) return backendSessions.map(sessionFromApi)
+
   const ids = await readSessionIndex()
   const loaded = await Promise.all(ids.map((id) => getSession(id)))
   const fromKv = loaded.filter((session): session is Session => Boolean(session))
