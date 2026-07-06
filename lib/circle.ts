@@ -16,7 +16,7 @@ import {
 // objects in its .d.ts, but only `Blockchain` is present in the runtime ESM
 // bundle (`TestnetBlockchain` is types-only at the moment). Using the literal
 // strings directly is safer and structurally type-equivalent.
-const ARC_TESTNET = 'ARC-TESTNET' as const
+export const ARC_TESTNET = 'ARC-TESTNET' as const
 import type { Address } from 'viem'
 import { env } from './env'
 import { readUsdcBalance, ARC_TESTNET_USDC_ADDRESS } from './chain'
@@ -98,6 +98,51 @@ export async function transferUsdcFromTreasury(
   const id = res.data?.id
   if (!id) throw new Error('Circle did not return a transaction id')
   return { transactionId: id }
+}
+
+export async function transferUsdcFromWallet(opts: {
+  walletId: string
+  toAddress: Address
+  amount: string
+}): Promise<{
+  transactionId: string
+  txHash?: string
+  state?: string
+  sourceAddress?: string
+  destinationAddress?: string
+}> {
+  const client = getCircleClient()
+  const response = await client.createTransaction({
+    walletId: opts.walletId,
+    destinationAddress: opts.toAddress,
+    amount: [opts.amount],
+    tokenAddress: ARC_TESTNET_USDC_ADDRESS,
+    blockchain: ARC_TESTNET,
+    fee: { type: 'level', config: { feeLevel: 'MEDIUM' } },
+  } as unknown as Parameters<typeof client.createTransaction>[0])
+  const transactionId = response.data?.id
+  if (!transactionId) throw new Error('Circle did not return a transaction id')
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 90_000)
+  try {
+    const txResponse = await client.getTransaction({
+      id: transactionId,
+      waitForState: 'SENT',
+      pollingInterval: 2_000,
+      signal: controller.signal,
+    })
+    const tx = txResponse.data?.transaction
+    return {
+      transactionId,
+      txHash: tx?.txHash,
+      state: tx?.state,
+      sourceAddress: tx?.sourceAddress,
+      destinationAddress: tx?.destinationAddress,
+    }
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /**

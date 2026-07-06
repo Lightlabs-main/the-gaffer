@@ -30,13 +30,30 @@
   },
   "include": [
     "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "lib/**/*.ts",
+    "scripts/**/*.ts",
     ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    ".next-dev/types/**/*.ts",
+    ".next-dev/dev/types/**/*.ts",
     "**/*.mts",
-    ".next/dev/types/**/*.ts"
+    ".next-codex/types/**/*.ts",
+    ".next-codex/dev/types/**/*.ts",
+    ".next-fast/types/**/*.ts",
+    ".next-fast/dev/types/**/*.ts",
+    ".next-fix/types/**/*.ts",
+    ".next-fix/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    ".next/**",
+    ".next-dev/**",
+    ".next-codex/**",
+    ".next-fast/**",
+    ".next-fix/**"
   ]
 }

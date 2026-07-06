@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import AccountPanel from '@/components/AccountPanel'
+import CircleAccountPanel from '@/components/CircleAccountPanel'
 import Scoreboard from '@/components/Scoreboard'
 import LivePlayerStream from '@/components/LivePlayerStream'
 import ManagerSpeech from '@/components/ManagerSpeech'
@@ -14,153 +14,125 @@ import CreatorEarnings from '@/components/CreatorEarnings'
 import MatchStatusPanel from '@/components/MatchStatusPanel'
 import ProvenancePanel from '@/components/ProvenancePanel'
 import AIScoutPanel from '@/components/AIScoutPanel'
-import { readProfileIdentity, upsertProfileMatch } from '@/lib/client-profile'
-import type { MatchState as SharedMatchState } from '@/lib/types'
-
-interface MatchEvent {
-  id: string
-  minute: number
-  type: string
-  text: string
-  isGoal?: boolean
-}
-
-interface DecisionOption {
-  id: string
-  label: string
-  description: string
-  totalStreamed: number
-}
-
-interface Decision {
-  id: string
-  type: string
-  prompt: string
-  options: DecisionOption[]
-  closesAt: number
-  isOpen: boolean
-}
-
-interface MatchState {
-  id: string
-  experienceLabel?: string
-  experienceSummary?: string
-  creatorWalletId: string
-  creatorAddress: string
-  homeTeam: {
-    name: string
-    score: number
-    formation: string
-    mentality: string
-    pressing: string
-  }
-  awayTeam: {
-    name: string
-    score: number
-    formation: string
-  }
-  minute: number
-  status: string
-  events: MatchEvent[]
-  currentDecision?: Decision
-  totalEarned: number
-}
+import MediaRoom from '@/components/MediaRoom'
+import {
+  hasCircleProfileIdentity,
+  readProfileIdentity,
+  upsertProfileMatch,
+} from '@/lib/client-profile'
+import type { MatchState, ProvenanceEvent } from '@/lib/types'
 
 interface Props {
   sessionId: string
+  initialSession?: SessionResponse | null
 }
 
-interface ProvenanceEvent {
-  id: string
-  ts: number
-  minute: number
-  category: string
-  title: string
-  detail: string
+interface SessionResponse {
+  sessionId: string
+  matchState: MatchState
+  participants: number
+  createdAt: number
+  connectedClients: number
+  provenanceEvents: ProvenanceEvent[]
 }
 
-function readStoredWallet(sessionId: string): { walletId: string; address: string } | null {
-  if (typeof window === 'undefined') return null
-  const storageKey = `gaffer_wallet_${sessionId}`
-  const stored = localStorage.getItem(storageKey)
-  if (!stored) return null
-  try {
-    const parsed = JSON.parse(stored) as { walletId?: string; address?: string }
-    if (parsed.walletId && parsed.address) {
-      return { walletId: parsed.walletId, address: parsed.address }
-    }
-  } catch {
-    localStorage.removeItem(storageKey)
-  }
-  return null
-}
-
-export default function MatchRoom({ sessionId }: Props) {
-  const initialWallet = useMemo(() => readStoredWallet(sessionId), [sessionId])
-  const [matchState, setMatchState] = useState<MatchState | null>(null)
-  const [connected, setConnected] = useState(false)
+export default function MatchRoom({ sessionId, initialSession = null }: Props) {
+  const [matchState, setMatchState] = useState<MatchState | null>(
+    initialSession?.matchState ?? null,
+  )
+  const [connected, setConnected] = useState(Boolean(initialSession))
   const [managerSpeech, setManagerSpeech] = useState<string | null>(null)
   const [speechKey, setSpeechKey] = useState<string | null>(null)
-  const [walletStatus, setWalletStatus] = useState<'loading' | 'ready' | 'error'>(
-    initialWallet ? 'ready' : 'loading',
-  )
-  const [walletAddress, setWalletAddress] = useState<string | null>(
-    initialWallet?.address ?? null,
-  )
-  const [walletId, setWalletId] = useState<string | null>(
-    initialWallet?.walletId ?? null,
-  )
+  const [walletStatus, setWalletStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [walletAddress, setWalletAddress] = useState<string | null>(null)
+  const [walletId, setWalletId] = useState<string | null>(null)
   const [walletError, setWalletError] = useState<string | null>(null)
   const [gatewayReady, setGatewayReady] = useState(false)
   const [preparingGateway, setPreparingGateway] = useState(false)
+  const [storedWalletLoaded, setStoredWalletLoaded] = useState(false)
   const [matchStarted, setMatchStarted] = useState(false)
   const [creatorWalletId, setCreatorWalletId] = useState<string | null>(null)
   const [copiedLink, setCopiedLink] = useState(false)
   const [sessionError, setSessionError] = useState<string | null>(null)
-  const [provenanceEvents, setProvenanceEvents] = useState<ProvenanceEvent[]>([])
+  const [provenanceEvents, setProvenanceEvents] = useState<ProvenanceEvent[]>(
+    initialSession?.provenanceEvents ?? [],
+  )
   const [authVersion, setAuthVersion] = useState(0)
+  const [signedIn, setSignedIn] = useState(false)
   const eventSourceRef = useRef<EventSource | null>(null)
 
   useEffect(() => {
+    function refreshIdentity() {
+      setSignedIn(hasCircleProfileIdentity())
+    }
     function onAuthChanged() {
+      refreshIdentity()
       setAuthVersion((version) => version + 1)
     }
+    refreshIdentity()
     window.addEventListener('gaffer-auth-changed', onAuthChanged)
     return () => window.removeEventListener('gaffer-auth-changed', onAuthChanged)
   }, [])
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const identity = readProfileIdentity()
+      if (identity?.loginProvider === 'email') {
+        setWalletId(identity.walletId)
+        setWalletAddress(identity.address)
+        setWalletStatus('loading')
+        setWalletError(null)
+        setStoredWalletLoaded(true)
+        return
+      }
+      setWalletId(null)
+      setWalletAddress(null)
+      setWalletStatus('loading')
+      setStoredWalletLoaded(true)
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [sessionId])
+
   // Set up participant wallet on mount
   useEffect(() => {
-    const storageKey = `gaffer_wallet_${sessionId}`
+    if (!storedWalletLoaded) return
 
-    // Register the logged-in account wallet for this match.
+    // Register the logged-in Circle account wallet for this room.
     let cancelled = false
     async function createWallet() {
+      if (!signedIn) {
+        setWalletId(null)
+        setWalletAddress(null)
+        setWalletStatus('error')
+        setWalletError('Login with email to create your Arc wallet for this room.')
+        return
+      }
       try {
         setWalletError(null)
-        if (!initialWallet) setWalletStatus('loading')
-        const profile = readProfileIdentity()
-        const existingWallet = profile ?? initialWallet
+        setWalletStatus('loading')
+        const identity = readProfileIdentity()
+        if (!identity || identity.loginProvider !== 'email') {
+          throw new Error('Login with email so Gaffer can create your Circle Arc wallet.')
+        }
         const res = await fetch('/api/wallet/participant', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             sessionId,
-            walletId: existingWallet?.walletId,
-            address: existingWallet?.address,
+            walletId: identity.walletId,
+            address: identity.address,
           }),
         })
         if (cancelled) return
         if (!res.ok) {
           const data = await res.json()
-          throw new Error(data.message || 'Wallet creation failed')
+          throw new Error(data.message || data.error || 'Wallet registration failed')
         }
         const data = await res.json()
         const wallet = {
           walletId: data.participant.walletId,
           address: data.participant.address,
         }
-        localStorage.setItem(storageKey, JSON.stringify(wallet))
         setWalletId(wallet.walletId)
         setWalletAddress(wallet.address)
         setGatewayReady(Boolean(data.participant.gatewayReady))
@@ -182,7 +154,7 @@ export default function MatchRoom({ sessionId }: Props) {
 
     void createWallet()
     return () => { cancelled = true }
-  }, [sessionId, initialWallet, authVersion])
+  }, [sessionId, storedWalletLoaded, authVersion, signedIn])
 
   async function prepareGateway() {
     if (!walletId || !walletAddress || preparingGateway) return
@@ -204,7 +176,9 @@ export default function MatchRoom({ sessionId }: Props) {
         throw new Error(
           data.message ||
             data.error ||
-            (data.stage ? `Gateway preparation failed at ${data.stage}` : 'Gateway preparation failed'),
+            (data.stage
+              ? `Gateway preparation failed at ${data.stage}`
+              : 'Gateway preparation failed'),
         )
       }
       setGatewayReady(Boolean(data.participant.gatewayReady))
@@ -344,6 +318,11 @@ export default function MatchRoom({ sessionId }: Props) {
         case 'provenance':
           setProvenanceEvents((prev) => [...prev, data.event])
           break
+
+        case 'seed-updated':
+          setMatchState(data.matchState)
+          syncCreatorProfile(data.matchState)
+          break
       }
     } catch {
       // Ignore parse errors on heartbeats / comments
@@ -360,6 +339,12 @@ export default function MatchRoom({ sessionId }: Props) {
   useEffect(() => {
     let cancelled = false
     async function loadSessionBeforeStream() {
+      if (initialSession) {
+        setMatchState(initialSession.matchState)
+        setProvenanceEvents(initialSession.provenanceEvents ?? [])
+        syncCreatorProfile(initialSession.matchState)
+        return
+      }
       try {
         const res = await fetch(`/api/session/${sessionId}`)
         if (cancelled) return
@@ -396,7 +381,7 @@ export default function MatchRoom({ sessionId }: Props) {
       es.close()
       eventSourceRef.current = null
     }
-  }, [sessionId, handleSseEvent, syncCreatorProfile])
+  }, [sessionId, handleSseEvent, syncCreatorProfile, initialSession])
 
   useEffect(() => {
     if (!matchState) return
@@ -407,6 +392,10 @@ export default function MatchRoom({ sessionId }: Props) {
   // Start match engine when ready (creator auto-starts)
   useEffect(() => {
     if (!matchState || matchStarted) return
+    if (matchState.roomKind && matchState.roomKind !== 'football') {
+      const mediaReadyTimer = window.setTimeout(() => setMatchStarted(true), 0)
+      return () => window.clearTimeout(mediaReadyTimer)
+    }
     if (matchState.status !== 'pre-match') {
       const alreadyStartedTimer = window.setTimeout(() => setMatchStarted(true), 0)
       return () => window.clearTimeout(alreadyStartedTimer)
@@ -433,16 +422,16 @@ export default function MatchRoom({ sessionId }: Props) {
   // Loading state
   if (sessionError) {
     return (
-      <div className="gaffer-shell flex min-h-screen items-center justify-center px-4 text-zinc-950">
-        <div className="match-panel max-w-lg p-6 text-center">
-          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--pitch-dim)]">
+      <div className="flex min-h-screen items-center justify-center bg-paper px-4 text-ink">
+        <div className="max-w-lg rounded-sm border border-rule bg-card p-6 text-center">
+          <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-accent">
             Match unavailable
           </p>
           <h1 className="mt-2 text-2xl font-semibold">This session is gone</h1>
-          <p className="mt-3 text-sm leading-6 text-zinc-600">{sessionError}</p>
+          <p className="mt-3 text-sm leading-6 text-ink-muted">{sessionError}</p>
           <Link
             href="/"
-            className="mt-5 inline-flex rounded-lg bg-[var(--pitch-green)] px-4 py-2 text-sm font-semibold text-white"
+            className="mt-5 inline-flex rounded-sm bg-ink px-4 py-2 text-sm font-medium text-paper"
           >
             Create a new match
           </Link>
@@ -453,16 +442,39 @@ export default function MatchRoom({ sessionId }: Props) {
 
   if (!matchState) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--background)]">
+      <div className="flex min-h-screen items-center justify-center bg-paper text-ink">
         <div className="text-center">
-          <div className="text-lg font-bold text-[var(--pitch-green)]">
+          <div className="font-mono text-xs uppercase tracking-[0.24em] text-accent">
             The Gaffer
           </div>
-          <div className="mt-2 text-sm text-zinc-500">
+          <div className="mt-2 text-sm text-ink-muted">
             {connected ? 'Loading match...' : 'Connecting...'}
           </div>
         </div>
       </div>
+    )
+  }
+
+  if (matchState.roomKind && matchState.roomKind !== 'football') {
+    return (
+      <MediaRoom
+        sessionId={sessionId}
+        matchState={{
+          ...matchState,
+          roomKind: matchState.roomKind,
+          experienceLabel: matchState.experienceLabel ?? 'Interactive media room',
+          experienceSummary:
+            matchState.experienceSummary ??
+            'Audience members pay USDC to unlock and steer this creator seed.',
+        }}
+        walletId={walletId}
+        walletAddress={walletAddress}
+        walletStatus={walletStatus}
+        walletError={walletError}
+        creatorWalletId={creatorWalletId}
+        provenanceEvents={provenanceEvents}
+        onMatchState={(nextState) => setMatchState(nextState)}
+      />
     )
   }
 
@@ -531,7 +543,7 @@ export default function MatchRoom({ sessionId }: Props) {
           hasOpenDecision={Boolean(matchState.currentDecision?.isOpen)}
         />
 
-        <AIScoutPanel matchState={matchState as SharedMatchState} />
+        <AIScoutPanel matchState={matchState} />
 
         {/* Manager Speech */}
         <ManagerSpeech speech={managerSpeech} speechKey={speechKey} />
@@ -551,7 +563,7 @@ export default function MatchRoom({ sessionId }: Props) {
       </div>
 
       <aside className="flex flex-col gap-3">
-        <AccountPanel />
+        <CircleAccountPanel />
 
         <section className="match-panel p-4">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-950">

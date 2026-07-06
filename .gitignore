@@ -15,6 +15,7 @@
 
 # next.js
 /.next/
+/.next-*/
 /out/
 
 # production
@@ -49,3 +50,4 @@ recovery_file_*.dat
 # Local demo runtime state
 .gaffer-store/
 .gaffer-dev.*.log
+dev-server.*.log

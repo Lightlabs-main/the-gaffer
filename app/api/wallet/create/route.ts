@@ -1,22 +1,19 @@
 /**
  * POST /api/wallet/create
  *
- * Creates a fresh Arc Testnet custodial wallet via Circle and returns the
- * real walletId + address + current on-chain balance.
- *
- * No mocks. No hardcoded values. The balance is read directly from the
- * Arc Testnet USDC contract.
+ * Logs a user in by email and returns a stable Circle Arc Testnet wallet for
+ * that email. The wallet is reused on later logins instead of rotating.
  */
 import { NextResponse } from 'next/server'
-import { createUserWallet } from '@/lib/circle'
-import { readUsdcBalance } from '@/lib/chain'
+import { createOrGetWalletForEmail } from '@/lib/wallet-login'
 
-// Force dynamic — this endpoint mutates external state.
 export const dynamic = 'force-dynamic'
 
+interface Body {
+  email?: string
+}
+
 function detailErr(err: unknown): { stage: string; message: string; details: unknown } {
-  // Circle SDK errors expose: message, code, errors[], status, response.data.
-  // Surface everything we can so the failure isn't opaque.
   const anyErr = err as {
     message?: string
     code?: string | number
@@ -32,31 +29,23 @@ function detailErr(err: unknown): { stage: string; message: string; details: unk
       status: anyErr.status ?? anyErr.response?.status ?? null,
       errors: anyErr.errors ?? null,
       responseData: anyErr.response?.data ?? null,
-      // last-ditch: enumerable keys
       keys: Object.keys(anyErr ?? {}),
     },
   }
 }
 
-export async function POST(): Promise<NextResponse> {
-  let stage = 'create'
+export async function POST(req: Request): Promise<NextResponse> {
+  let stage = 'parse'
   try {
-    const { walletId, address } = await createUserWallet()
-    console.log('[wallet/create] created', { walletId, address })
+    const body = (await req.json().catch(() => ({}))) as Body
+    const email = body.email?.trim().toLowerCase()
+    if (!email) {
+      return NextResponse.json({ message: 'email is required' }, { status: 400 })
+    }
 
-    stage = 'read-balance'
-    const balance = await readUsdcBalance(address)
-    console.log('[wallet/create] on-chain balance', balance.formatted, 'USDC')
-
-    return NextResponse.json({
-      walletId,
-      address,
-      balance: balance.formatted,
-      balanceRaw: balance.raw.toString(),
-      chainId: 5042002,
-      asset: 'USDC (Arc Testnet)',
-      fundingRequired: balance.raw === 0n,
-    })
+    stage = 'login'
+    const result = await createOrGetWalletForEmail(email)
+    return NextResponse.json(result)
   } catch (err: unknown) {
     const info = detailErr(err)
     info.stage = stage

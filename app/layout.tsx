@@ -1,12 +1,14 @@
+/* eslint-disable @next/next/no-page-custom-font */
 import type { Metadata } from "next"
 import Script from "next/script"
+import CopyHandler from "@/components/CopyHandler"
 import ThemeToggle from "@/components/ThemeToggle"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "The Gaffer - The Crowd Decides",
+  title: "Gaffer - Paid interactive media",
   description:
-    "Live virtual football managed by the crowd with USDC micropayments. Money is the steering wheel.",
+    "Creators publish a seed. Audiences pay USDC to unlock and steer. Every creative decision is recorded as provenance on Arc.",
 }
 
 export default function RootLayout({
@@ -20,6 +22,14 @@ export default function RootLayout({
       className="h-full antialiased"
       suppressHydrationWarning
     >
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body className="flex min-h-full flex-col" suppressHydrationWarning>
         <Script
           id="gaffer-theme-init"
@@ -58,9 +68,14 @@ export default function RootLayout({
                 console.error = function () {
                   var args = Array.prototype.slice.call(arguments);
                   var isFetchNoise = args.some(function (arg) {
+                    var message = '';
+                    try {
+                      message = arg && arg.message ? arg.message : String(arg || '');
+                    } catch (e) {}
                     return (
                       (arg && arg.name === 'TypeError' && arg.message === 'Failed to fetch') ||
-                      arg === 'Failed to fetch'
+                      arg === 'Failed to fetch' ||
+                      message.indexOf('Failed to connect to MetaMask') !== -1
                     );
                   });
                   if (isFetchNoise) return;
@@ -68,7 +83,14 @@ export default function RootLayout({
                 };
                 window.addEventListener('unhandledrejection', function (event) {
                   var reason = event.reason;
-                  if (reason && reason.name === 'TypeError' && reason.message === 'Failed to fetch') {
+                  var message = '';
+                  try {
+                    message = reason && reason.message ? reason.message : String(reason || '');
+                  } catch (e) {}
+                  if (
+                    (reason && reason.name === 'TypeError' && reason.message === 'Failed to fetch') ||
+                    message.indexOf('Failed to connect to MetaMask') !== -1
+                  ) {
                     event.preventDefault();
                   }
                 });
@@ -77,6 +99,7 @@ export default function RootLayout({
           }}
         />
         {children}
+        <CopyHandler />
         <ThemeToggle />
       </body>
     </html>

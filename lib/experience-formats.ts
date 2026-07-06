@@ -1,5 +1,44 @@
 export const EXPERIENCE_FORMATS = [
   {
+    id: 'article-room',
+    label: 'Interactive article room',
+    shortLabel: 'Article',
+    summary: 'Readers pay to unlock a creator article, then pay again to generate their own branch or angle.',
+    creatorLabel: 'Article title',
+    opponentLabel: 'Core topic',
+    defaultHome: 'The Hidden Cost of Passive Media',
+    defaultAway: 'How paid steering changes creator work',
+    accent: 'article',
+    status: 'live',
+    roomKind: 'article',
+  },
+  {
+    id: 'live-video-room',
+    label: 'Live video steering room',
+    shortLabel: 'Live Video',
+    summary: 'A creator goes live with Daily while viewers pay USDC to steer prompts, questions, and scene direction.',
+    creatorLabel: 'Live room title',
+    opponentLabel: 'Show topic',
+    defaultHome: 'Founder Office Hours Live',
+    defaultAway: 'Audience-paid questions and direction',
+    accent: 'video',
+    status: 'live',
+    roomKind: 'live-video',
+  },
+  {
+    id: 'ai-story-video',
+    label: 'AI story video generator',
+    shortLabel: 'AI Video',
+    summary: 'Fans pay to turn a creator story seed into personalized storyboard-video branches.',
+    creatorLabel: 'Story seed title',
+    opponentLabel: 'World / premise',
+    defaultHome: 'One Trial in Europe',
+    defaultAway: 'A young striker gets one impossible chance',
+    accent: 'story-video',
+    status: 'live',
+    roomKind: 'story-video',
+  },
+  {
     id: 'football-simulation',
     label: 'Football simulation stream',
     shortLabel: 'Football',
@@ -10,6 +49,7 @@ export const EXPERIENCE_FORMATS = [
     defaultAway: 'Algorithm United',
     accent: 'tactics',
     status: 'live',
+    roomKind: 'football',
   },
   {
     id: 'fantasy-watch-party',
@@ -22,6 +62,7 @@ export const EXPERIENCE_FORMATS = [
     defaultAway: 'Weekend Slate',
     accent: 'lineups',
     status: 'next',
+    roomKind: 'live-video',
   },
   {
     id: 'esports-coaching',
@@ -34,6 +75,7 @@ export const EXPERIENCE_FORMATS = [
     defaultAway: 'Ranked Finals',
     accent: 'macro',
     status: 'next',
+    roomKind: 'live-video',
   },
   {
     id: 'ai-reality-show',
@@ -46,6 +88,7 @@ export const EXPERIENCE_FORMATS = [
     defaultAway: 'Season One',
     accent: 'twists',
     status: 'next',
+    roomKind: 'story-video',
   },
   {
     id: 'live-storytelling-game',
@@ -58,6 +101,7 @@ export const EXPERIENCE_FORMATS = [
     defaultAway: 'The Black Gate',
     accent: 'story',
     status: 'next',
+    roomKind: 'story-video',
   },
   {
     id: 'creator-competition',
@@ -70,6 +114,7 @@ export const EXPERIENCE_FORMATS = [
     defaultAway: 'Fan-Funded Finals',
     accent: 'prizes',
     status: 'next',
+    roomKind: 'live-video',
   },
   {
     id: 'twitch-plays-micropayments',
@@ -82,10 +127,12 @@ export const EXPERIENCE_FORMATS = [
     defaultAway: 'Live Scenario',
     accent: 'control',
     status: 'next',
+    roomKind: 'live-video',
   },
 ] as const
 
 export type ExperienceType = (typeof EXPERIENCE_FORMATS)[number]['id']
+export type RoomKind = (typeof EXPERIENCE_FORMATS)[number]['roomKind']
 
 export function getExperienceFormat(id?: string) {
   return (

@@ -1,13 +1,28 @@
 @import "tailwindcss";
+@source "../app";
+@source "../components";
+@source "../lib";
+@source not "../.next";
+@source not "../.next-dev";
+@source not "../.next-codex";
+@source not "../.next-fast";
+@source not "../.next-fix";
 
 :root {
   --background: #fafafa;
   --foreground: #18181b;
-  --pitch-green: #07543f;
-  --pitch-dim: #0b7a55;
-  --pitch: #07543f;
-  --pitch-deep: #052d23;
-  --accent: #facc15;
+  --paper: oklch(98.5% 0.004 90);
+  --ink: oklch(14% 0.01 260);
+  --ink-muted: oklch(48% 0.01 260);
+  --rule: oklch(14% 0.01 260 / 0.12);
+  --card: oklch(100% 0 0);
+  --secondary: oklch(96% 0.005 90);
+  --live: oklch(62% 0.23 25);
+  --pitch-green: #e85d4f;
+  --pitch-dim: #b8443b;
+  --pitch: #e85d4f;
+  --pitch-deep: #191113;
+  --accent: oklch(58% 0.22 27);
   --gold: #facc15;
   --sky: #61dafb;
   --line: rgba(255, 255, 255, 0.16);
@@ -18,11 +33,18 @@
 html.dark {
   --background: #09090b;
   --foreground: #f4f4f5;
-  --pitch-green: #00a06b;
-  --pitch-dim: #10b981;
-  --pitch: #00a06b;
-  --pitch-deep: #041f19;
-  --accent: #facc15;
+  --paper: oklch(14% 0.012 260);
+  --ink: oklch(96% 0.005 90);
+  --ink-muted: oklch(66% 0.01 260);
+  --rule: oklch(96% 0.005 90 / 0.14);
+  --card: oklch(18% 0.012 260);
+  --secondary: oklch(22% 0.01 260);
+  --live: oklch(70% 0.2 25);
+  --pitch-green: #ff6b5c;
+  --pitch-dim: #f25549;
+  --pitch: #ff6b5c;
+  --pitch-deep: #1d1113;
+  --accent: oklch(72% 0.19 30);
   --gold: #facc15;
   --line: rgba(255, 255, 255, 0.16);
 }
@@ -30,18 +52,36 @@ html.dark {
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-rule: var(--rule);
+  --color-card: var(--card);
+  --color-secondary: var(--secondary);
+  --color-accent: var(--accent);
+  --color-live: var(--live);
   --color-pitch: var(--pitch-green);
   --color-pitch-dim: var(--pitch-dim);
   --color-bar-a: var(--bar-a);
   --color-bar-b: var(--bar-b);
-  --font-sans: Arial, Helvetica, sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --font-sans: "Schibsted Grotesk", Arial, Helvetica, sans-serif;
+  --font-serif: "Instrument Serif", Georgia, serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-feature-settings: "ss01", "cv11";
+}
+
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: -0.01em;
+  font-weight: 400;
 }
 
 .stadium-bg {
@@ -53,6 +93,30 @@ body {
 .gaffer-shell {
   background: #fafafa;
   color: #18181b;
+}
+
+.gaffer-marquee {
+  animation: gaffer-marquee 45s linear infinite;
+}
+
+.gaffer-input {
+  width: 100%;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 0.75rem 0.85rem;
+  font-size: 0.875rem;
+  outline: none;
+}
+
+.gaffer-input::placeholder {
+  color: color-mix(in oklab, var(--ink-muted) 70%, transparent);
+}
+
+.gaffer-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
 html.dark body {
@@ -283,7 +347,7 @@ html.dark .bg-zinc-50 {
 }
 
 html.dark .bg-emerald-50 {
-  background-color: rgba(16, 185, 129, 0.13) !important;
+  background-color: rgba(255, 107, 92, 0.13) !important;
 }
 
 html.dark .border-zinc-200,
@@ -359,6 +423,11 @@ html.dark ::selection {
 }
 
 @keyframes ticker-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes gaffer-marquee {
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }

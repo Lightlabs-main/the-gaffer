@@ -4,18 +4,9 @@
  * Body: { sessionId: string, walletId?: string, address?: string,
  *         prepareGateway?: boolean, gatewayUsdc?: string }
  *
- * Registers a joiner's wallet for a match session.
- *
- *   1. Uses the signed-up Circle wallet passed by the browser, or creates a
- *      fresh Circle developer-controlled wallet if none exists yet.
- *   2. Reads the wallet's real Arc Testnet USDC balance.
- *   3. If `prepareGateway` is true, approves and deposits `gatewayUsdc`
- *      into Circle Gateway so the wallet can stream x402 taps.
- *   4. Records the wallet in the per-session participant registry so
- *      /api/decision/stream can look it up by walletId.
- *
- * No treasury transfer happens here. Users fund their own wallet, then prepare
- * Gateway from that funded wallet.
+ * Registers the signed-in user's Circle Arc wallet for a room. If
+ * `prepareGateway` is true, the endpoint deposits from that wallet into Circle
+ * Gateway so football decision streams can settle through x402 batching.
  */
 import { NextResponse } from 'next/server'
 import { getAddress, type Address } from 'viem'
@@ -32,7 +23,7 @@ interface Body {
   walletId?: string
   address?: string
   prepareGateway?: boolean
-  gatewayUsdc?: string // decimal e.g. "0.05"
+  gatewayUsdc?: string
 }
 
 const PARTICIPANT_GATEWAY_USDC = '0.05'
@@ -53,7 +44,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     }
     const gatewayUsdc = body.gatewayUsdc ?? PARTICIPANT_GATEWAY_USDC
 
-    stage = 'wallet-create'
+    stage = 'wallet-resolve'
     const wallet =
       body.walletId && body.address
         ? {
@@ -62,12 +53,14 @@ export async function POST(req: Request): Promise<NextResponse> {
           }
         : await createUserWallet()
 
+    const existingParticipant = getParticipant(session.id, wallet.walletId)
+
     stage = 'read-wallet-balance'
     const onChainBalance = await readUsdcBalance(wallet.address)
-    let approveTransactionId: string | undefined
-    let depositTransactionId: string | undefined
-    let gatewayDepositedUsdc: string | undefined
     let gatewayBalance = await readGatewayAvailableBalance(wallet.address)
+    let approveTransactionId = existingParticipant?.approveTransactionId
+    let depositTransactionId = existingParticipant?.depositTransactionId
+    let gatewayDepositedUsdc = existingParticipant?.gatewayDepositedUsdc
 
     if (body.prepareGateway) {
       stage = 'gateway-deposit'
@@ -88,13 +81,12 @@ export async function POST(req: Request): Promise<NextResponse> {
     }
 
     stage = 'store-participant'
-    const existingParticipant = getParticipant(session.id, wallet.walletId)
     addParticipant(session.id, {
       walletId: wallet.walletId,
       address: wallet.address,
-      gatewayDepositedUsdc: gatewayDepositedUsdc ?? existingParticipant?.gatewayDepositedUsdc,
-      approveTransactionId: approveTransactionId ?? existingParticipant?.approveTransactionId,
-      depositTransactionId: depositTransactionId ?? existingParticipant?.depositTransactionId,
+      gatewayDepositedUsdc,
+      approveTransactionId,
+      depositTransactionId,
       createdAt: existingParticipant?.createdAt ?? Date.now(),
     })
     if (!existingParticipant) session.participants += 1
@@ -116,6 +108,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         depositTransactionId,
       },
       participants: session.participants,
+      reused: Boolean(existingParticipant),
     })
   } catch (err: unknown) {
     const anyErr = err as {
@@ -150,7 +143,7 @@ async function waitForGatewayBalance(opts: {
   while (Date.now() - start < timeoutMs) {
     const bal = await readGatewayAvailableBalance(opts.depositor)
     if (bal.raw >= opts.atLeastAtomic) return bal
-    await new Promise((r) => setTimeout(r, intervalMs))
+    await new Promise((resolve) => setTimeout(resolve, intervalMs))
   }
   return readGatewayAvailableBalance(opts.depositor)
 }

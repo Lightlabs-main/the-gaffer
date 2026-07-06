@@ -7,6 +7,7 @@ import {
   hasProfileIdentity,
   readProfileMatches,
   shortAddress,
+  type ProfileIdentity,
   type ProfileMatchRecord,
   type ProfileStatus,
 } from '@/lib/client-profile'
@@ -22,9 +23,13 @@ interface SessionProbe {
   }
 }
 
-export default function ProfilePanel() {
+export default function ProfilePanel({
+  initialIdentity = null,
+}: {
+  initialIdentity?: ProfileIdentity | null
+}) {
   const [matches, setMatches] = useState<ProfileMatchRecord[]>([])
-  const [signedIn, setSignedIn] = useState(false)
+  const [signedIn, setSignedIn] = useState(Boolean(initialIdentity))
   const [hadStaleData, setHadStaleData] = useState(false)
 
   useEffect(() => {
@@ -78,14 +83,14 @@ export default function ProfilePanel() {
   const closed = matches.filter((m) => m.status === 'closed' || m.status === 'offline')
 
   return (
-    <section className="match-panel p-4">
+    <section className="rounded-sm border border-rule bg-card p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-950">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-ink">
           Profile
         </h2>
         <Link
           href="/profile"
-          className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-semibold text-[var(--pitch-green)] hover:border-[var(--pitch-green)]/60"
+          className="rounded-full border border-rule px-3 py-1 text-xs font-semibold text-accent hover:bg-secondary"
         >
           Open
         </Link>
@@ -97,32 +102,34 @@ export default function ProfilePanel() {
       </div>
       <div className="mt-3 flex max-h-40 flex-col gap-2 overflow-y-auto">
         {!signedIn ? (
-          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-            <p className="text-xs leading-5 text-zinc-600">
-              You are not logged in, so no match history is attached to this
+          <div className="rounded-sm border border-rule bg-secondary p-3">
+            <p className="text-xs leading-5 text-ink-muted">
+              You are not logged in, so no room history is attached to this
               browser account yet.
             </p>
             {hadStaleData && (
               <button
                 onClick={clearStaleData}
-                className="mt-3 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-semibold text-zinc-700 hover:border-[var(--pitch-green)]/60"
+                className="mt-3 rounded-full border border-rule px-3 py-1 text-xs font-semibold text-ink hover:bg-card"
               >
                 Clear old test profile data
               </button>
             )}
           </div>
         ) : matches.length === 0 ? (
-          <p className="text-xs text-zinc-500">Matches you create or join will appear here.</p>
+          <p className="text-xs text-ink-muted">
+            Rooms you create or join will appear here.
+          </p>
         ) : (
           matches.slice(0, 6).map((match) => (
             <Link
               key={`${match.role}-${match.sessionId}`}
               href={`/session/${match.sessionId}`}
-              className="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs hover:border-[var(--pitch-dim)]/60"
+              className="flex items-center justify-between rounded-sm border border-rule bg-secondary px-3 py-2 text-xs hover:border-accent/60"
             >
               <span>
-                <span className="font-semibold text-zinc-800">{match.role}</span>
-                <span className="ml-2 font-mono text-zinc-500">
+                <span className="font-semibold text-ink">{match.role}</span>
+                <span className="ml-2 font-mono text-ink-muted">
                   {match.sessionId.slice(0, 8)}...
                 </span>
               </span>
@@ -132,7 +139,7 @@ export default function ProfilePanel() {
         )}
       </div>
       {matches[0]?.address && (
-        <div className="mt-3 border-t border-zinc-200 pt-3 font-mono text-xs text-zinc-500">
+        <div className="mt-3 border-t border-rule pt-3 font-mono text-xs text-ink-muted">
           Latest wallet {shortAddress(matches[0].address)}
         </div>
       )}
@@ -142,9 +149,9 @@ export default function ProfilePanel() {
 
 function ProfileStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-2">
-      <div className="font-mono text-lg font-semibold text-zinc-950">{value}</div>
-      <div className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</div>
+    <div className="rounded-sm border border-rule bg-secondary px-2 py-2">
+      <div className="font-mono text-lg font-semibold text-ink">{value}</div>
+      <div className="text-[10px] uppercase tracking-wider text-ink-muted">{label}</div>
     </div>
   )
 }
@@ -156,7 +163,7 @@ function statusFromMatch(status?: string): ProfileStatus {
 }
 
 function statusClass(status?: ProfileStatus): string {
-  if (status === 'running') return 'text-[var(--pitch-green)]'
-  if (status === 'closed') return 'text-sky-600'
-  return 'text-zinc-500'
+  if (status === 'running') return 'text-accent'
+  if (status === 'closed') return 'text-ink'
+  return 'text-ink-muted'
 }

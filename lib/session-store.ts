@@ -1,4 +1,5 @@
 import type { Session } from './types'
+import { normalizeUsdc } from './money'
 
 /**
  * Module-singleton session store.
@@ -10,7 +11,9 @@ import type { Session } from './types'
 const sessions = new Map<string, Session>()
 
 export function getSession(id: string): Session | undefined {
-  return sessions.get(id)
+  const session = sessions.get(id)
+  if (session) session.matchState.totalEarned = normalizeUsdc(session.matchState.totalEarned)
+  return session
 }
 
 export function setSession(session: Session): void {

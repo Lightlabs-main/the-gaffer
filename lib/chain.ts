@@ -3,8 +3,9 @@
  * Circle's API — this is the "real evidence" half of the anti-fake doctrine.
  */
 import { createPublicClient, http, defineChain, erc20Abi, formatUnits, type Address } from 'viem'
+import { env } from './env'
 
-export const ARC_TESTNET_RPC = 'https://arc-testnet.drpc.org'
+export const ARC_TESTNET_RPC = env.arcTestnetRpcUrl()
 export const ARC_TESTNET_CHAIN_ID = 5042002
 export const ARC_TESTNET_USDC_ADDRESS: Address = '0x3600000000000000000000000000000000000000'
 

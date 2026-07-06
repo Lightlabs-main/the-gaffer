@@ -46,21 +46,43 @@ function optional(key: string): string | undefined {
   return v && v.length > 0 ? v : undefined
 }
 
+function optionalAny(keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = optional(key)
+    if (value) return value
+  }
+  return undefined
+}
+
+function needAny(keys: string[]): string {
+  const value = optionalAny(keys)
+  if (!value) throw new Error(`Missing required env var: ${keys.join(' or ')}`)
+  return value
+}
+
 export const env = {
   circleApiKey: () => need('CIRCLE_API_KEY'),
-  entitySecret: () => need('ENTITY_SECRET'),
+  entitySecret: () => needAny(['ENTITY_SECRET', 'CIRCLE_ENTITY_SECRET']),
   walletSetId: () => need('CIRCLE_WALLET_SET_ID'),
   treasuryWalletId: () => need('TREASURY_WALLET_ID'),
   treasuryAddress: () => need('TREASURY_ADDRESS'),
   anthropicKey: () => need('ANTHROPIC_API_KEY'),
-  anthropicModel: () => 'claude-sonnet-4-6',
+  anthropicModel: () => optional('ANTHROPIC_MODEL') ?? 'claude-opus-4-8',
+  arcTestnetRpcUrl: () =>
+    optionalAny(['ARC_RPC_URL', 'ARC_TESTNET_RPC_URL']) ??
+    'https://rpc.testnet.arc.network',
+  dailyApiKey: () => optional('DAILY_API_KEY'),
+  tavilyApiKey: () => optional('TAVILY_API_KEY'),
   appUrl: () => optional('NEXT_PUBLIC_APP_URL') ?? 'http://localhost:3000',
 
   // Non-throwing accessors for setup scripts
   optionalCircleApiKey: () => optional('CIRCLE_API_KEY'),
-  optionalEntitySecret: () => optional('ENTITY_SECRET'),
+  optionalEntitySecret: () => optionalAny(['ENTITY_SECRET', 'CIRCLE_ENTITY_SECRET']),
   optionalWalletSetId: () => optional('CIRCLE_WALLET_SET_ID'),
   optionalTreasuryWalletId: () => optional('TREASURY_WALLET_ID'),
   optionalTreasuryAddress: () => optional('TREASURY_ADDRESS'),
   optionalAnthropicModel: () => optional('ANTHROPIC_MODEL'),
+  optionalArcTestnetRpcUrl: () => optionalAny(['ARC_RPC_URL', 'ARC_TESTNET_RPC_URL']),
+  optionalDailyApiKey: () => optional('DAILY_API_KEY'),
+  optionalTavilyApiKey: () => optional('TAVILY_API_KEY'),
 }

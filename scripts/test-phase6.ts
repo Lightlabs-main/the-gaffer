@@ -6,6 +6,7 @@ import type { EngineResult } from '../lib/decision-engine'
 const baseMatch: MatchState = {
   id: 'phase6-local-proof',
   experienceType: 'football-simulation',
+  roomKind: 'football',
   experienceLabel: 'Football simulation stream',
   experienceSummary: 'Fans manage a live simulated club through tactical USDC streams.',
   creatorWalletId: 'not-used-in-phase6',

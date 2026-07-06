@@ -51,19 +51,22 @@ export default function CreatorEarnings({
   }
 
   return (
-    <section className="match-panel p-4">
+    <section className="rounded-sm border border-rule bg-card p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-950">
-            Creator Earnings
+          <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-accent">
+            Payouts
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-ink">
+            Creator earnings
           </h2>
-          <p className="mt-1 text-xs text-zinc-500">
-            This appears only for the browser that created the match.
+          <p className="mt-1 text-xs text-ink-muted">
+            Withdraw earned USDC from the room settlement wallet.
           </p>
         </div>
-        <div className="text-right font-mono text-lg font-semibold text-[var(--pitch-green)]">
+        <div className="text-right font-mono text-lg font-semibold text-ink">
           {totalEarned.toFixed(4)}
-          <span className="ml-1 text-xs text-zinc-500">USDC</span>
+          <span className="ml-1 text-xs text-ink-muted">USDC</span>
         </div>
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_120px]">
@@ -71,32 +74,32 @@ export default function CreatorEarnings({
           value={destinationAddress}
           onChange={(e) => setDestinationAddress(e.target.value)}
           placeholder="Withdrawal address"
-          className="rounded-lg border border-zinc-200 bg-white px-3 py-2 font-mono text-xs text-zinc-950 outline-none focus:border-[var(--pitch-green)]"
+          className="gaffer-input font-mono text-xs"
         />
         <input
           value={amountUsdc}
           onChange={(e) => setAmountUsdc(e.target.value)}
           placeholder={defaultAmount}
-          className="rounded-lg border border-zinc-200 bg-white px-3 py-2 font-mono text-xs text-zinc-950 outline-none focus:border-[var(--pitch-green)]"
+          className="gaffer-input font-mono text-xs"
         />
       </div>
       <button
         onClick={withdraw}
         disabled={!creatorWalletId || !destinationAddress || totalEarned <= 0 || busy}
-        className="mt-3 w-full rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--pitch-deep)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-3 w-full rounded-sm bg-ink px-4 py-3 text-sm font-medium text-paper transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {busy ? 'Checking Gateway balance...' : 'Withdraw earned USDC'}
       </button>
       {totalEarned <= 0 && (
-        <p className="mt-2 text-xs text-zinc-500">
-          Nothing to withdraw yet. Earnings appear after players stream USDC during a decision window.
+        <p className="mt-2 text-xs text-ink-muted">
+          Nothing to withdraw yet. Earnings appear after supporters unlock or steer this room.
         </p>
       )}
-      <div className="mt-2 font-mono text-[10px] text-zinc-600">
+      <div className="mt-2 font-mono text-[10px] text-ink-muted">
         Creator {creatorAddress.slice(0, 6)}...{creatorAddress.slice(-4)}
       </div>
       {status && (
-        <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-2 text-xs text-zinc-600">
+        <div className="mt-3 rounded-sm border border-rule bg-secondary p-2 text-xs text-ink-muted">
           {status}
         </div>
       )}

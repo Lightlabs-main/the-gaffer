@@ -23,6 +23,7 @@ import { produceManagerVerdict } from './manager'
 import { resolveTactic } from './tactic-mapping'
 import { appendProvenance } from './provenance'
 import { updateOpponentCoach } from './opponent-coach'
+import { addUsdc } from './money'
 
 interface WindowState {
   windowId: string
@@ -141,8 +142,8 @@ export function recordTap(session: Session, input: TapInput): {
   state.taps.push(tap)
   if (decision.taps !== state.taps) decision.taps.push(tap)
 
-  option.totalStreamed += input.amount
-  session.matchState.totalEarned += input.amount
+  option.totalStreamed = addUsdc(option.totalStreamed, input.amount)
+  session.matchState.totalEarned = addUsdc(session.matchState.totalEarned, input.amount)
   // streamingRate: USDC per second, smoothed over the most recent 2s of taps
   const recentCutoff = now - 2_000
   const recentForOption = state.taps.filter(

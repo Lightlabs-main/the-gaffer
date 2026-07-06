@@ -1,7 +1,7 @@
 export type Formation = '4-4-2' | '4-3-3' | '3-5-2' | '4-2-3-1' | '5-3-2'
 export type Mentality = 'attacking' | 'balanced' | 'defensive'
 export type PressingStyle = 'high' | 'mid' | 'low'
-export type { ExperienceType } from './experience-formats'
+export type { ExperienceType, RoomKind } from './experience-formats'
 
 export interface DecisionOption {
   id: string
@@ -78,8 +78,17 @@ export interface OpponentCoachState {
 export interface MatchState {
   id: string
   experienceType: import('./experience-formats').ExperienceType
+  roomKind: import('./experience-formats').RoomKind
   experienceLabel: string
   experienceSummary: string
+  seedTitle?: string
+  seedTopic?: string
+  seedContent?: string
+  dailyRoomUrl?: string
+  accessPriceUsdc?: string
+  steerPriceUsdc?: string
+  unlockedWallets?: string[]
+  branches?: MediaBranch[]
   creatorWalletId: string
   creatorAddress: string
   homeTeam: {
@@ -103,6 +112,30 @@ export interface MatchState {
   opponentCoach?: OpponentCoachState
 }
 
+export interface MediaBranchScene {
+  title: string
+  visual: string
+  caption: string
+}
+
+export interface MediaBranch {
+  id: string
+  walletId: string
+  address: string
+  prompt: string
+  kind: 'article-branch' | 'video-director' | 'storyboard-video'
+  title: string
+  summary: string
+  body: string
+  scenes?: MediaBranchScene[]
+  amountUsdc: string
+  settlementId?: string
+  createdAt: number
+  model?: string
+  requestId?: string | null
+  latencyMs?: number
+}
+
 export type ProvenanceCategory =
   | 'session'
   | 'window'
@@ -112,6 +145,8 @@ export type ProvenanceCategory =
   | 'simulation'
   | 'result'
   | 'wallet'
+  | 'access'
+  | 'branch'
 
 export interface ProvenanceEvent {
   id: string
