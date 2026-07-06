@@ -24,7 +24,7 @@ export async function POST(req: Request): Promise<NextResponse> {
       )
     }
 
-    const session = getSession(body.sessionId)
+    const session = await getSession(body.sessionId)
     if (!session) {
       return NextResponse.json({ error: 'session not found' }, { status: 404 })
     }
@@ -65,7 +65,7 @@ export async function POST(req: Request): Promise<NextResponse> {
       session.matchState.dailyRoomUrl = nextDailyRoomUrl
     }
 
-    persistSession(session)
+    await persistSession(session)
     appendProvenance(session, {
       category: 'session',
       title: 'Creator seed updated',

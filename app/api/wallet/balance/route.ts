@@ -33,7 +33,7 @@ export async function GET(): Promise<NextResponse> {
     const balance = await readUsdcBalance(identity.address as `0x${string}`)
     const fundingWarning =
       balance.raw > 0n ? undefined : identity.fundingWarning
-    upsertUserWallet({
+    await upsertUserWallet({
       email: identity.email,
       walletId: identity.walletId,
       address: identity.address as `0x${string}`,

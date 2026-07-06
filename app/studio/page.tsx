@@ -28,7 +28,7 @@ export default async function StudioHome({
     cookieStore.get('gaffer_profile_identity')?.value,
   )
   const initialSignedIn = Boolean(identity?.loginProvider === 'email')
-  const initialRooms: StudioRoomSummary[] = listSessions()
+  const initialRooms: StudioRoomSummary[] = (await listSessions())
     .filter((session) =>
       identity?.walletId
         ? session.matchState.creatorWalletId === identity.walletId

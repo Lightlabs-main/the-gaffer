@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Address } from 'viem'
+import { kvGetJson, kvSetJson } from './persistent-kv'
 
 export interface StoredUserWallet {
   email: string
@@ -25,7 +26,11 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase()
 }
 
-function ensureLoaded(): void {
+function walletKey(email: string): string {
+  return `gaffer:user-wallet:${normalizeEmail(email)}`
+}
+
+function ensureLoadedFromDisk(): void {
   if (loadedFromDisk) return
   loadedFromDisk = true
   if (!existsSync(STORE_FILE)) return
@@ -44,7 +49,7 @@ function ensureLoaded(): void {
   }
 }
 
-function saveAll(): void {
+function saveAllToDisk(): void {
   try {
     mkdirSync(STORE_DIR, { recursive: true })
     writeFileSync(
@@ -56,21 +61,37 @@ function saveAll(): void {
   }
 }
 
-export function getUserWallet(email: string): StoredUserWallet | undefined {
-  ensureLoaded()
-  return walletsByEmail.get(normalizeEmail(email))
+export async function getUserWallet(
+  email: string,
+): Promise<StoredUserWallet | undefined> {
+  const normalized = normalizeEmail(email)
+  const cached = walletsByEmail.get(normalized)
+  if (cached) return cached
+
+  try {
+    const kvWallet = await kvGetJson<StoredUserWallet>(walletKey(normalized))
+    if (kvWallet?.email && kvWallet.walletId && kvWallet.address) {
+      const wallet = { ...kvWallet, email: normalized }
+      walletsByEmail.set(normalized, wallet)
+      return wallet
+    }
+  } catch (err) {
+    console.warn('[user-wallet-store] KV read failed, falling back to local file', err)
+  }
+
+  ensureLoadedFromDisk()
+  return walletsByEmail.get(normalized)
 }
 
-export function upsertUserWallet(
+export async function upsertUserWallet(
   wallet: Omit<StoredUserWallet, 'email' | 'createdAt' | 'updatedAt'> & {
     email: string
     createdAt?: number
     updatedAt?: number
   },
-): StoredUserWallet {
-  ensureLoaded()
+): Promise<StoredUserWallet> {
   const email = normalizeEmail(wallet.email)
-  const current = walletsByEmail.get(email)
+  const current = (await getUserWallet(email)) ?? walletsByEmail.get(email)
   const now = Date.now()
   const next: StoredUserWallet = {
     ...current,
@@ -80,6 +101,13 @@ export function upsertUserWallet(
     updatedAt: wallet.updatedAt ?? now,
   }
   walletsByEmail.set(email, next)
-  saveAll()
+
+  try {
+    await kvSetJson(walletKey(email), next)
+  } catch (err) {
+    console.warn('[user-wallet-store] KV write failed, falling back to local file', err)
+    saveAllToDisk()
+  }
+
   return next
 }

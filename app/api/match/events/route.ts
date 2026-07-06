@@ -31,7 +31,7 @@ export async function GET(req: Request): Promise<Response> {
       headers: { 'content-type': 'application/json' },
     })
   }
-  const session = getSession(sessionId)
+  const session = await getSession(sessionId)
   if (!session) {
     return new Response(JSON.stringify({ error: 'session not found', sessionId }), {
       status: 404,

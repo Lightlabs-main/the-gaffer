@@ -22,7 +22,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         { status: 400 },
       )
     }
-    const session = getSession(body.sessionId)
+    const session = await getSession(body.sessionId)
     if (!session) {
       return NextResponse.json({ error: 'session not found' }, { status: 404 })
     }
@@ -75,7 +75,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         state: settlement.settle.state,
       },
     })
-    persistSession(session)
+    await persistSession(session)
 
     return NextResponse.json({
       sessionId: session.id,

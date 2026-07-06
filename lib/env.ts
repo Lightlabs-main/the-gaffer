@@ -85,4 +85,6 @@ export const env = {
   optionalArcTestnetRpcUrl: () => optionalAny(['ARC_RPC_URL', 'ARC_TESTNET_RPC_URL']),
   optionalDailyApiKey: () => optional('DAILY_API_KEY'),
   optionalTavilyApiKey: () => optional('TAVILY_API_KEY'),
+  optionalKvRestApiUrl: () => optional('KV_REST_API_URL'),
+  optionalKvRestApiToken: () => optional('KV_REST_API_TOKEN'),
 }

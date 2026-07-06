@@ -29,7 +29,7 @@ export async function POST(req: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'invalid payerAddress' }, { status: 400 })
     }
 
-    const session = getSession(body.sessionId)
+    const session = await getSession(body.sessionId)
     if (!session) {
       return NextResponse.json({ error: 'session not found' }, { status: 404 })
     }
@@ -49,7 +49,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         txHash: body.txHash,
       },
     })
-    persistSession(session)
+    await persistSession(session)
 
     return NextResponse.json({
       ok: true,

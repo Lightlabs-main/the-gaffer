@@ -41,7 +41,7 @@ import { BatchEvmScheme } from '@circle-fin/x402-batching/client'
 import { GatewayEvmScheme } from '@circle-fin/x402-batching/server'
 import { parseUnits } from 'viem'
 import type { Address } from 'viem'
-import { getSession } from '@/lib/session-store'
+import { getCachedSession, getSession } from '@/lib/session-store'
 import { getParticipant } from '@/lib/participant-store'
 import { recordTap } from '@/lib/decision-lifecycle'
 import {
@@ -86,7 +86,7 @@ const x402Server = new x402ResourceServer(
     if (!pending) return
     pendingTapsByNonce.delete(nonce)
 
-    const session = getSession(pending.sessionId)
+    const session = await getSession(pending.sessionId)
     if (!session) return
 
     const amountFromSettlement = Number(
@@ -107,9 +107,9 @@ const x402Server = new x402ResourceServer(
 const protectedStreamPost = withX402<unknown>(
   async (req: NextRequest) => {
     const body = await parseBody(req)
-    const prepared = (() => {
+    const prepared = await (async () => {
       try {
-        return prepareTap(req, body)
+        return await prepareTap(req, body)
       } catch (err) {
         if (err instanceof StreamRequestError) return err
         throw err
@@ -175,7 +175,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const incomingPayment =
       req.headers.get('payment-signature') || req.headers.get('x-payment')
     const body = await parseBody(req)
-    const prepared = prepareTap(req, body)
+    const prepared = await prepareTap(req, body)
     if (incomingPayment) {
       return protectedStreamPost(
         buildInternalX402Request(req, body, prepared, incomingPayment),
@@ -233,7 +233,7 @@ async function parseBody(req: Request): Promise<Body> {
   return (await req.json().catch(() => ({}))) as Body
 }
 
-function prepareTap(req: NextRequest, body: Body): PreparedTap {
+async function prepareTap(req: NextRequest, body: Body): Promise<PreparedTap> {
   const querySessionId = req.nextUrl.searchParams.get('sessionId')
   const queryAmountUsdc = req.nextUrl.searchParams.get('amountUsdc')
   if (!body.sessionId || !body.optionId || !body.participantWalletId) {
@@ -252,7 +252,7 @@ function prepareTap(req: NextRequest, body: Body): PreparedTap {
     throw new StreamRequestError(400, 'query amountUsdc does not match body amountUsdc')
   }
 
-  const session = getSession(body.sessionId)
+  const session = await getSession(body.sessionId)
   if (!session) {
     throw new StreamRequestError(404, 'session not found')
   }
@@ -321,7 +321,7 @@ function payToFromContext(context: {
   const raw = context.adapter.getQueryParam?.('sessionId')
   const sessionId = Array.isArray(raw) ? raw[0] : raw
   if (!sessionId) return '0x0000000000000000000000000000000000000000'
-  const session = getSession(sessionId)
+  const session = getCachedSession(sessionId)
   return session?.matchState.creatorAddress ?? '0x0000000000000000000000000000000000000000'
 }
 

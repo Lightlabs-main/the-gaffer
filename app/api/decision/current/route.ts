@@ -16,7 +16,7 @@ export async function GET(req: Request): Promise<NextResponse> {
   if (!sessionId) {
     return NextResponse.json({ error: 'sessionId query param required' }, { status: 400 })
   }
-  const session = getSession(sessionId)
+  const session = await getSession(sessionId)
   if (!session) {
     return NextResponse.json({ error: 'session not found', sessionId }, { status: 404 })
   }

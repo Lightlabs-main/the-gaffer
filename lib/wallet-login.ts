@@ -28,7 +28,7 @@ export async function createOrGetWalletForEmail(
     throw new Error('email is required')
   }
 
-  const stored = getUserWallet(email)
+  const stored = await getUserWallet(email)
   if (stored) {
     let balance = {
       formatted: stored.balance ?? '0',
@@ -43,7 +43,7 @@ export async function createOrGetWalletForEmail(
         message: err instanceof Error ? err.message : String(err),
       })
     }
-    const updated = upsertUserWallet({
+    const updated = await upsertUserWallet({
       ...stored,
       balance: balance.formatted,
       balanceRaw: balance.raw.toString(),
@@ -85,7 +85,7 @@ export async function createOrGetWalletForEmail(
     ? await waitForUsdcBalance(address)
     : { formatted: '0', raw: 0n }
 
-  const saved = upsertUserWallet({
+  const saved = await upsertUserWallet({
     email,
     walletId,
     address,

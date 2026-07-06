@@ -29,7 +29,7 @@ export async function POST(req: Request): Promise<NextResponse> {
       )
     }
 
-    const session = getSession(body.sessionId)
+    const session = await getSession(body.sessionId)
     if (!session) {
       return NextResponse.json({ error: 'session not found' }, { status: 404 })
     }

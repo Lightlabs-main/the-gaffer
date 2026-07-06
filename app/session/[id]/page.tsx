@@ -9,7 +9,7 @@ export default async function SessionPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const session = getSession(id)
+  const session = await getSession(id)
   const initialSession = session
     ? {
         sessionId: session.id,

@@ -150,7 +150,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         fundingWarning,
       },
     })
-    setSession(session)
+    await setSession(session)
 
     console.log('[session/create] created', { sessionId, walletId, address })
 
