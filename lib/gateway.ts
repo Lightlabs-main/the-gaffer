@@ -45,6 +45,7 @@ export const TESTNET_GATEWAY_MINTER: Address = '0x0022222ABE238Cc2C7Bb1f21003F0a
  */
 export const CIRCLE_BATCHING_NAME = 'GatewayWalletBatched'
 export const CIRCLE_BATCHING_VERSION = '1'
+export const CIRCLE_GATEWAY_MIN_VALIDITY_SECONDS = 604_800
 export { GATEWAY_AUTH_VALIDITY_WINDOW_SECONDS }
 
 /** CAIP-2 network string for Arc Testnet — what the facilitator keys settle by. */
@@ -495,7 +496,7 @@ export function buildBatchingPaymentRequirements(opts: {
       name: CIRCLE_BATCHING_NAME,
       version: CIRCLE_BATCHING_VERSION,
       verifyingContract: getAddress(TESTNET_GATEWAY_WALLET).toLowerCase(),
-      minValiditySeconds: GATEWAY_AUTH_VALIDITY_WINDOW_SECONDS,
+      minValiditySeconds: CIRCLE_GATEWAY_MIN_VALIDITY_SECONDS,
       assets: [
         {
           symbol: 'USDC',
