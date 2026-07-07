@@ -118,6 +118,9 @@ export interface TapInput {
   amount: number // USDC (decimal, e.g. 0.0001)
   ts?: number
   note?: string
+  settlementTransaction?: string
+  settlementNetwork?: string
+  payer?: string
 }
 
 export function recordTap(session: Session, input: TapInput): {
@@ -172,6 +175,11 @@ export function recordTap(session: Session, input: TapInput): {
       optionLabel: option.label,
       amountUsdc: input.amount,
       ...(note ? { supporterNote: note } : {}),
+      ...(input.settlementTransaction
+        ? { settlementTransaction: input.settlementTransaction }
+        : {}),
+      ...(input.settlementNetwork ? { settlementNetwork: input.settlementNetwork } : {}),
+      ...(input.payer ? { payer: input.payer } : {}),
       totalForOption: option.totalStreamed,
       totalEarned: session.matchState.totalEarned,
     },

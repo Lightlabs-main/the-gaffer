@@ -65,7 +65,7 @@ interface Body {
   note?: string
 }
 
-const X402_VERSION = 1
+const X402_VERSION = 2
 const DEFAULT_TAP_USDC = '0.0001'
 
 interface PreparedTap {
@@ -102,6 +102,9 @@ const x402Server = new x402ResourceServer(
       optionId: pending.optionId,
       amount: amountFromSettlement,
       note: pending.note,
+      settlementTransaction: context.result.transaction,
+      settlementNetwork: context.result.network,
+      payer: context.result.payer,
     })
   })
   .onSettleFailure(async (context) => {
@@ -220,8 +223,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     )
 
     stage = 'x402-protected-submit'
+    const signedWithAccepted = {
+      ...signed,
+      resource: {
+        url: new URL(req.url).pathname,
+        description: 'Stream one Gaffer supporter tap toward the selected option',
+        mimeType: 'application/json',
+      },
+      accepted: requirements,
+    }
     const paymentHeader = encodePaymentSignatureHeader(
-      signed as unknown as Parameters<typeof encodePaymentSignatureHeader>[0],
+      signedWithAccepted as unknown as Parameters<typeof encodePaymentSignatureHeader>[0],
     )
     return protectedStreamPost(
       buildInternalX402Request(req, body, prepared, paymentHeader),
