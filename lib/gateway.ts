@@ -476,19 +476,33 @@ export function buildBatchingPaymentRequirements(opts: {
   amount: string
   payTo: string
   maxTimeoutSeconds: number
-  extra: { name: string; version: string; verifyingContract: string }
+  extra: {
+    name: string
+    version: string
+    verifyingContract: string
+    minValiditySeconds: number
+    assets: Array<{ symbol: string; address: string; decimals: number }>
+  }
 } {
   return {
     scheme: 'exact',
     network: ARC_TESTNET_NETWORK,
-    asset: ARC_TESTNET_USDC_ADDRESS,
+    asset: ARC_TESTNET_USDC_ADDRESS.toLowerCase(),
     amount: opts.amountAtomic,
-    payTo: getAddress(opts.payTo),
+    payTo: getAddress(opts.payTo).toLowerCase(),
     maxTimeoutSeconds: GATEWAY_AUTH_VALIDITY_WINDOW_SECONDS,
     extra: {
       name: CIRCLE_BATCHING_NAME,
       version: CIRCLE_BATCHING_VERSION,
-      verifyingContract: getAddress(TESTNET_GATEWAY_WALLET),
+      verifyingContract: getAddress(TESTNET_GATEWAY_WALLET).toLowerCase(),
+      minValiditySeconds: GATEWAY_AUTH_VALIDITY_WINDOW_SECONDS,
+      assets: [
+        {
+          symbol: 'USDC',
+          address: ARC_TESTNET_USDC_ADDRESS.toLowerCase(),
+          decimals: 6,
+        },
+      ],
     },
   }
 }
