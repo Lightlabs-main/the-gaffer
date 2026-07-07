@@ -22,6 +22,8 @@ interface Props {
   decision: Decision | null
   sessionId: string
   participantWalletId: string | null
+  participantAddress?: string | null
+  creatorAddress?: string | null
   walletReady: boolean
   gatewayReady: boolean
   preparingGateway?: boolean
@@ -32,6 +34,8 @@ export default function DecisionWindow({
   decision,
   sessionId,
   participantWalletId,
+  participantAddress,
+  creatorAddress,
   walletReady,
   gatewayReady,
   preparingGateway = false,
@@ -72,7 +76,14 @@ export default function DecisionWindow({
     )
   }
 
-  const canSettle = Boolean(walletReady && gatewayReady && participantWalletId)
+  const isCreatorWallet = Boolean(
+    participantAddress &&
+      creatorAddress &&
+      participantAddress.toLowerCase() === creatorAddress.toLowerCase(),
+  )
+  const canSettle = Boolean(
+    walletReady && gatewayReady && participantWalletId && !isCreatorWallet,
+  )
 
   async function submitSteer(optionId: string) {
     if (!participantWalletId || !canSettle) return
@@ -191,6 +202,13 @@ export default function DecisionWindow({
             </button>
           )}
         </div>
+      )}
+      {walletReady && gatewayReady && isCreatorWallet && (
+        <p className="mt-3 rounded-sm border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-100">
+          This wallet owns the room, so Circle blocks it from paying itself.
+          Share the session link, sign in with a different reader account, and
+          steer from that funded wallet to get a real settlement record.
+        </p>
       )}
       {streamSuccess && (
         <p className="mt-3 rounded-sm border border-emerald-500/30 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-100">

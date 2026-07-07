@@ -306,6 +306,16 @@ async function prepareTap(req: NextRequest, body: Body): Promise<PreparedTap> {
     )
   }
 
+  if (
+    getAddress(participant.address) ===
+    getAddress(session.matchState.creatorAddress as Address)
+  ) {
+    throw new StreamRequestError(
+      409,
+      'This is the creator wallet for this room. Open the session link with a different reader account to settle a real paid steer.',
+    )
+  }
+
   return {
     sessionId: session.id,
     optionId: body.optionId,

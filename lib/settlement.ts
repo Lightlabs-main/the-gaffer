@@ -9,7 +9,7 @@ import {
 import { ARC_TESTNET, transferUsdcFromWallet } from './circle'
 import { env } from './env'
 
-const X402_VERSION = 1
+const X402_VERSION = 2
 const SETTLEMENT_TIMEOUT_MS = 20_000
 
 export interface SettlementResult {

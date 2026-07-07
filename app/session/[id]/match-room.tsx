@@ -580,6 +580,8 @@ export default function MatchRoom({ sessionId, initialSession = null }: Props) {
             decision={matchState.currentDecision}
             sessionId={sessionId}
             participantWalletId={walletId}
+            participantAddress={walletAddress}
+            creatorAddress={matchState.creatorAddress}
             walletReady={walletStatus === 'ready'}
             gatewayReady={gatewayReady}
             preparingGateway={preparingGateway}
