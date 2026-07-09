@@ -285,6 +285,10 @@ function SeedPanel({ matchState }: { matchState: MatchState }) {
     )
   }
 
+  if (matchState.roomKind === 'story-video') {
+    return <StorySeedReelPreview matchState={matchState} />
+  }
+
   return (
     <section className="rounded-sm border border-rule bg-card p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -302,6 +306,48 @@ function SeedPanel({ matchState }: { matchState: MatchState }) {
       </div>
       <div className="mt-4 max-h-[620px] overflow-y-auto whitespace-pre-wrap rounded-sm border border-rule bg-secondary p-5 text-[15px] leading-8 text-ink">
         {matchState.seedContent}
+      </div>
+    </section>
+  )
+}
+
+function StorySeedReelPreview({ matchState }: { matchState: MatchState }) {
+  return (
+    <section className="rounded-sm border border-rule bg-card p-5">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
+            Original story reel
+          </p>
+          <h2 className="mt-1 text-2xl font-semibold text-ink">Creator seed preview</h2>
+        </div>
+        <span className="rounded-full border border-rule px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-ink-muted">
+          Unlocked
+        </span>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(260px,390px)_1fr]">
+        <div className="mx-auto w-full max-w-[390px]">
+          <AnimeReelFrame
+            eyebrow="Seed episode"
+            title={matchState.seedTitle ?? matchState.homeTeam.name}
+            caption={reelCaptionFromText(matchState.seedContent, matchState.seedTopic)}
+            footer={matchState.seedTopic ?? matchState.awayTeam.name}
+            sceneIndex={1}
+            sceneTotal={1}
+            tone="romance"
+          />
+        </div>
+        <div className="flex min-w-0 flex-col rounded-sm border border-rule bg-secondary p-4">
+          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
+            Story seed
+          </p>
+          <h3 className="mt-2 text-xl font-semibold text-ink">{matchState.seedTitle}</h3>
+          <p className="mt-2 text-sm leading-6 text-ink-muted">{matchState.seedTopic}</p>
+          <div className="mt-4 max-h-[520px] overflow-y-auto whitespace-pre-wrap rounded-sm border border-rule bg-card p-4 text-sm leading-7 text-ink">
+            {matchState.seedContent}
+          </div>
+        </div>
       </div>
     </section>
   )
@@ -466,11 +512,11 @@ function StoryboardVideoPlayer({ branch }: { branch: MediaBranch }) {
   if (!activeScene) return null
 
   return (
-    <div className="mt-4 overflow-hidden rounded-sm border border-rule bg-zinc-950 text-white shadow-2xl">
-      <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+    <div className="mt-4 rounded-sm border border-rule bg-zinc-950 p-4 text-white shadow-2xl">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-accent">
-            AI story video preview
+            AI story reel
           </p>
           <h4 className="mt-1 text-sm font-semibold">{branch.title}</h4>
         </div>
@@ -478,49 +524,126 @@ function StoryboardVideoPlayer({ branch }: { branch: MediaBranch }) {
           Auto playing
         </span>
       </div>
-      <div className="relative aspect-video overflow-hidden bg-[radial-gradient(circle_at_20%_10%,rgba(255,107,92,0.38),transparent_24%),radial-gradient(circle_at_80%_15%,rgba(255,205,65,0.22),transparent_18%),linear-gradient(135deg,#07080d,#171923_46%,#0b1014)]">
-        <div className="absolute inset-0 opacity-35 [background-image:linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:42px_42px]" />
-        <div className="absolute inset-0 flex flex-col justify-between p-5">
-          <div className="flex items-start justify-between gap-4">
-            <span className="rounded-full bg-black/45 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-zinc-200">
-              Scene {active + 1} / {scenes.length}
-            </span>
-            <span className="rounded-full bg-red-500 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-white">
-              Generated
-            </span>
-          </div>
-          <div className="max-w-2xl">
-            <h5 className="text-2xl font-semibold leading-tight">{activeScene.title}</h5>
-            <p className="mt-3 text-lg leading-8 text-zinc-100">{activeScene.visual}</p>
-          </div>
-          <div className="rounded-sm bg-black/55 p-3 text-sm leading-6 text-zinc-100 backdrop-blur">
-            {activeScene.caption}
-          </div>
+      <div className="grid gap-5 lg:grid-cols-[minmax(260px,390px)_1fr]">
+        <div className="mx-auto w-full max-w-[390px]">
+          <AnimeReelFrame
+            eyebrow="Generated episode"
+            title={activeScene.title}
+            caption={activeScene.caption || activeScene.visual}
+            footer={activeScene.visual}
+            sceneIndex={active + 1}
+            sceneTotal={scenes.length}
+            tone={active % 2 === 0 ? 'romance' : 'shadow'}
+          />
         </div>
-      </div>
-      <div className="grid gap-2 border-t border-white/10 p-3 sm:grid-cols-4">
-        {scenes.map((scene, index) => (
-          <button
-            key={`${branch.id}-scene-${index}`}
-            type="button"
-            onClick={() => setActive(index)}
-            className={`rounded-sm border p-3 text-left transition ${
-              index === active
-                ? 'border-accent bg-white text-black'
-                : 'border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10'
-            }`}
-          >
-            <span className="font-mono text-[10px] uppercase tracking-widest">
-              Frame {index + 1}
-            </span>
-            <span className="mt-1 line-clamp-2 block text-xs font-semibold">
-              {scene.title}
-            </span>
-          </button>
-        ))}
+        <div className="grid content-start gap-3">
+          {scenes.map((scene, index) => (
+            <button
+              key={`${branch.id}-scene-${index}`}
+              type="button"
+              onClick={() => setActive(index)}
+              className={`rounded-sm border p-3 text-left transition ${
+                index === active
+                  ? 'border-accent bg-white text-black'
+                  : 'border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10'
+              }`}
+            >
+              <span className="font-mono text-[10px] uppercase tracking-widest">
+                Frame {index + 1}
+              </span>
+              <span className="mt-1 block text-sm font-semibold">{scene.title}</span>
+              <span className="mt-1 line-clamp-2 block text-xs leading-5 opacity-80">
+                {scene.caption || scene.visual}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )
+}
+
+function AnimeReelFrame({
+  caption,
+  eyebrow,
+  footer,
+  sceneIndex,
+  sceneTotal,
+  title,
+  tone,
+}: {
+  caption: string
+  eyebrow: string
+  footer: string
+  sceneIndex: number
+  sceneTotal: number
+  title: string
+  tone: 'romance' | 'shadow'
+}) {
+  const isShadow = tone === 'shadow'
+  return (
+    <div className="relative aspect-[9/16] overflow-hidden rounded-[28px] border border-white/15 bg-zinc-950 shadow-2xl">
+      <div
+        className={`absolute inset-0 ${
+          isShadow
+            ? 'bg-[radial-gradient(circle_at_78%_12%,rgba(248,250,252,0.42),transparent_18%),radial-gradient(circle_at_18%_30%,rgba(99,102,241,0.45),transparent_28%),linear-gradient(155deg,#090914_0%,#21182d_45%,#0e1018_100%)]'
+            : 'bg-[radial-gradient(circle_at_80%_10%,rgba(255,255,255,0.52),transparent_17%),radial-gradient(circle_at_28%_32%,rgba(244,114,182,0.45),transparent_27%),linear-gradient(155deg,#f8d7e5_0%,#b8c7f4_48%,#332846_100%)]'
+        }`}
+      />
+      <div className="absolute inset-0 opacity-50 [background-image:radial-gradient(circle_at_50%_22%,rgba(255,255,255,0.42)_0_1px,transparent_2px),linear-gradient(120deg,transparent_0_42%,rgba(255,255,255,0.18)_43%,transparent_46%)] [background-size:34px_34px,100%_100%]" />
+      <div className="absolute -left-10 top-10 h-72 w-48 rotate-12 rounded-[48%] bg-white/24 blur-sm" />
+      <div className="absolute right-6 top-20 h-48 w-28 rounded-full bg-black/30 blur-md" />
+      <div className="absolute bottom-0 left-0 right-0 h-2/3 bg-gradient-to-t from-black via-black/55 to-transparent" />
+
+      <div className="absolute left-4 right-4 top-4 flex items-center justify-between">
+        <span className="rounded-full bg-black/40 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-white backdrop-blur">
+          {eyebrow}
+        </span>
+        <span className="rounded-full bg-white/20 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-white backdrop-blur">
+          {sceneIndex}/{sceneTotal}
+        </span>
+      </div>
+
+      <div className="absolute right-3 top-1/2 flex -translate-y-1/2 flex-col items-center gap-4 text-white">
+        <ReelAction label="458" symbol="♡" />
+        <ReelAction label="2" symbol="◯" />
+        <ReelAction label="13" symbol="↗" />
+      </div>
+
+      <div className="absolute bottom-5 left-5 right-12">
+        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/70">
+          {title}
+        </p>
+        <p
+          className="mt-3 text-2xl font-black leading-tight text-white sm:text-3xl"
+          style={{ textShadow: '0 3px 12px rgba(0,0,0,0.9)' }}
+        >
+          {caption}
+        </p>
+        <p className="mt-4 line-clamp-2 text-xs leading-5 text-white/75">{footer}</p>
+      </div>
+    </div>
+  )
+}
+
+function ReelAction({ label, symbol }: { label: string; symbol: string }) {
+  return (
+    <div className="grid justify-items-center gap-1">
+      <div className="grid h-9 w-9 place-items-center rounded-full bg-black/30 text-xl font-bold backdrop-blur">
+        {symbol}
+      </div>
+      <span className="text-[11px] font-semibold">{label}</span>
+    </div>
+  )
+}
+
+function reelCaptionFromText(text: string | undefined, fallback: string | undefined) {
+  const source = (text || fallback || 'A paid story seed is ready to branch.').trim()
+  const sentence = source
+    .split(/[.!?]\s+/)
+    .map((item) => item.trim())
+    .find((item) => item.length > 20)
+  return (sentence || source).slice(0, 145)
 }
 
 function StepCard({ label, title, body }: { label: string; title: string; body: string }) {
