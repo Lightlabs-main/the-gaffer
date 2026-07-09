@@ -74,6 +74,7 @@ export interface StudioRoomSummary {
   id: string
   roomKind: RoomKind
   experienceType: ExperienceType
+  status: MatchState['status']
   label: string
   title: string
   topic: string
@@ -82,17 +83,14 @@ export interface StudioRoomSummary {
   steerPriceUsdc: string
   totalEarned: number
   branches: number
+  paidSteers: number
+  unlocks: number
+  participants: number
   creatorWalletId: string
   creatorAddress: string
   lastTxHash?: string
+  provenanceEvents: ProvenanceEvent[]
 }
-
-const studioStats = [
-  ['USDC earned (30d)', '412.90', '+18%'],
-  ['Rooms live now', '3', '2 today'],
-  ['Paid steers (7d)', '1,204', '+31%'],
-  ['Unlocks (7d)', '5,821', '+12%'],
-]
 
 const sideGroups: Array<[string, StudioSection[]]> = [
   ['Studio', ['Overview']],
@@ -139,10 +137,17 @@ function roomFromSession(session: SessionApiSummary): StudioRoomSummary {
   const txEvent = [...session.provenanceEvents]
     .reverse()
     .find((event) => event.data?.txHash || event.data?.transactionId)
+  const paidSteers = session.provenanceEvents.filter(
+    (event) => event.category === 'stream' || event.category === 'branch',
+  ).length
+  const unlockEvents = session.provenanceEvents.filter(
+    (event) => event.category === 'access',
+  ).length
   return {
     id,
     roomKind: session.matchState.roomKind,
     experienceType: session.matchState.experienceType,
+    status: session.matchState.status,
     label: session.matchState.experienceLabel,
     title:
       session.matchState.seedTitle ||
@@ -157,6 +162,12 @@ function roomFromSession(session: SessionApiSummary): StudioRoomSummary {
     steerPriceUsdc: session.matchState.steerPriceUsdc ?? '0.0001',
     totalEarned: session.matchState.totalEarned,
     branches: session.matchState.branches?.length ?? 0,
+    paidSteers: Math.max(paidSteers, session.matchState.branches?.length ?? 0),
+    unlocks: Math.max(
+      unlockEvents,
+      session.matchState.unlockedWallets?.length ?? 0,
+    ),
+    participants: session.participants,
     creatorWalletId: session.matchState.creatorWalletId,
     creatorAddress: session.matchState.creatorAddress,
     lastTxHash:
@@ -165,6 +176,72 @@ function roomFromSession(session: SessionApiSummary): StudioRoomSummary {
         : typeof txEvent?.data?.transactionId === 'string'
           ? txEvent.data.transactionId
           : undefined,
+    provenanceEvents: session.provenanceEvents,
+  }
+}
+
+interface StudioMetrics {
+  totalEarned: number
+  liveRooms: number
+  closedRooms: number
+  paidSteers: number
+  unlocks: number
+  pending: number
+  activities: Array<{
+    id: string
+    label: string
+    actor: string
+    amount: string
+    createdAt: number
+  }>
+}
+
+function buildStudioMetrics(rooms: StudioRoomSummary[]): StudioMetrics {
+  const totalEarned = rooms.reduce((sum, room) => sum + room.totalEarned, 0)
+  const liveRooms = rooms.filter((room) => room.status !== 'full-time').length
+  const closedRooms = rooms.filter((room) => room.status === 'full-time').length
+  const paidSteers = rooms.reduce((sum, room) => sum + room.paidSteers, 0)
+  const unlocks = rooms.reduce((sum, room) => sum + room.unlocks, 0)
+  const pending = rooms
+    .filter((room) => room.status !== 'full-time')
+    .reduce((sum, room) => sum + room.totalEarned, 0)
+  const activities = rooms
+    .flatMap((room) =>
+      room.provenanceEvents
+        .filter((event) =>
+          ['access', 'stream', 'branch'].includes(event.category),
+        )
+        .map((event) => ({
+          id: `${room.id}-${event.id}`,
+          label:
+            event.category === 'access'
+              ? 'UNLOCK'
+              : event.category === 'branch'
+                ? 'BRANCH'
+                : 'STEER',
+          actor: shortId(
+            String(
+              event.data?.address ??
+                event.data?.payer ??
+                event.data?.walletId ??
+                room.creatorAddress,
+            ),
+          ),
+          amount: `${formatUsdcAmount(Number(event.data?.amountUsdc ?? 0))} USDC`,
+          createdAt: event.ts,
+        })),
+    )
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, 8)
+
+  return {
+    totalEarned,
+    liveRooms,
+    closedRooms,
+    paidSteers,
+    unlocks,
+    pending,
+    activities,
   }
 }
 
@@ -230,6 +307,7 @@ function StudioHomeForm({
   const [signedIn, setSignedIn] = useState(initialSignedIn)
   const [rooms, setRooms] = useState(initialRooms)
   const activeSection = initialSection
+  const metrics = useMemo(() => buildStudioMetrics(rooms), [rooms])
 
   const visibleFormats = useMemo(() => {
     const kind = roomKindBySection[activeSection]
@@ -387,6 +465,7 @@ function StudioHomeForm({
         <StudioTopbar
           canLaunch={false}
           onCreate={createMatch}
+          totalEarned={0}
         />
         <section className="mx-auto grid min-h-[calc(100vh-3.5rem)] max-w-[1200px] grid-cols-12 gap-8 px-4 py-8 sm:px-6 lg:py-14">
           <div className="col-span-12 flex flex-col justify-center lg:col-span-7">
@@ -440,6 +519,7 @@ function StudioHomeForm({
       <StudioTopbar
         canLaunch={canLaunch}
         onCreate={createMatch}
+        totalEarned={metrics.totalEarned}
       />
       <MobileSectionNav
         activeSection={activeSection}
@@ -453,6 +533,7 @@ function StudioHomeForm({
             <OverviewSection
               canLaunch={canLaunch}
               onCreate={createMatch}
+              metrics={metrics}
               rooms={rooms}
             />
           )}
@@ -493,11 +574,11 @@ function StudioHomeForm({
           )}
 
           {activeSection === 'Wallet' && (
-            <WalletSection initialIdentity={initialIdentity} />
+            <WalletSection initialIdentity={initialIdentity} metrics={metrics} />
           )}
-          {activeSection === 'Payouts' && <PayoutsSection />}
+          {activeSection === 'Payouts' && <PayoutsSection metrics={metrics} />}
           {activeSection === 'Provenance' && <ProvenanceSection />}
-          {activeSection === 'Audience' && <AudienceSection />}
+          {activeSection === 'Audience' && <AudienceSection metrics={metrics} />}
           {activeSection === 'Settings' && (
             <SettingsSection
               accessPriceUsdc={accessPriceUsdc}
@@ -515,9 +596,11 @@ function StudioHomeForm({
 function StudioTopbar({
   canLaunch,
   onCreate,
+  totalEarned,
 }: {
   canLaunch: boolean
   onCreate: () => void
+  totalEarned: number
 }) {
   return (
     <header className="sticky top-0 z-40 border-b border-rule bg-paper/95 backdrop-blur">
@@ -532,7 +615,7 @@ function StudioTopbar({
         </div>
         <div className="flex items-center gap-2">
           <span className="hidden items-center gap-1 rounded-full border border-rule px-2.5 py-1 font-mono text-[10px] uppercase tracking-widest text-ink-muted md:inline-flex">
-            42.18 USDC
+            {formatUsdcAmount(totalEarned)} USDC
           </span>
           <Link
             href={sectionHref('Wallet')}
@@ -630,14 +713,22 @@ function StudioSidebar({
 
 function OverviewSection({
   canLaunch,
+  metrics,
   onCreate,
   rooms,
 }: {
   canLaunch: boolean
+  metrics: StudioMetrics
   onCreate: () => void
   rooms: StudioRoomSummary[]
 }) {
   const recentRooms = rooms.slice(0, 4)
+  const studioStats = [
+    ['USDC earned', formatUsdcAmount(metrics.totalEarned), 'settled'],
+    ['Rooms live now', String(metrics.liveRooms), `${rooms.length} total`],
+    ['Paid steers', String(metrics.paidSteers), 'on Arc'],
+    ['Unlocks', String(metrics.unlocks), 'paid access'],
+  ]
   return (
     <div className="space-y-8">
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-rule pb-6">
@@ -1123,8 +1214,10 @@ function ArticleTrendAgentPanel({
 
 function WalletSection({
   initialIdentity,
+  metrics,
 }: {
   initialIdentity: ProfileIdentity | null
+  metrics: StudioMetrics
 }) {
   return (
     <div className="grid grid-cols-12 gap-6">
@@ -1137,9 +1230,9 @@ function WalletSection({
         </p>
         <div className="mt-4 grid grid-cols-3 gap-3 text-center">
           {[
-            ['Steered', '0'],
-            ['Running', '0'],
-            ['Closed', '0'],
+            ['Steered', String(metrics.paidSteers)],
+            ['Running', String(metrics.liveRooms)],
+            ['Closed', String(metrics.closedRooms)],
           ].map(([label, value]) => (
             <div key={label} className="rounded-sm border border-rule bg-secondary p-4">
               <p className="font-mono text-2xl font-semibold text-ink">{value}</p>
@@ -1158,7 +1251,7 @@ function WalletSection({
   )
 }
 
-function PayoutsSection() {
+function PayoutsSection({ metrics }: { metrics: StudioMetrics }) {
   return (
     <section className="rounded-sm border border-rule bg-card p-5">
       <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-accent">
@@ -1167,9 +1260,9 @@ function PayoutsSection() {
       <h1 className="mt-2 font-serif text-4xl">Creator USDC payouts.</h1>
       <div className="mt-6 grid gap-4 md:grid-cols-3">
         {[
-          ['Available', '42.18', 'Ready to withdraw'],
-          ['Pending', '8.60', 'Settling from active rooms'],
-          ['Paid out', '412.90', 'Last 30 days'],
+          ['Available', formatUsdcAmount(metrics.totalEarned), 'Settled in rooms'],
+          ['Pending', formatUsdcAmount(metrics.pending), 'Active rooms'],
+          ['Paid out', '0.0000', 'Withdrawals not run yet'],
         ].map(([label, value, copy]) => (
           <div key={label} className="rounded-sm border border-rule bg-secondary p-4">
             <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">
@@ -1214,7 +1307,7 @@ function ProvenanceSection() {
   )
 }
 
-function AudienceSection() {
+function AudienceSection({ metrics }: { metrics: StudioMetrics }) {
   return (
     <section className="rounded-sm border border-rule bg-card p-5">
       <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-accent">
@@ -1222,17 +1315,18 @@ function AudienceSection() {
       </p>
       <h1 className="mt-2 font-serif text-4xl">Supporter activity.</h1>
       <ul className="mt-6 divide-y divide-rule rounded-sm border border-rule">
-        {[
-          ['UNLOCK', '@lagos_reader', '0.50 USDC'],
-          ['STEER', '@tacticsmax', '1.20 USDC'],
-          ['BRANCH', 'Gaffer engine', '-'],
-          ['PAYOUT', 'Creator wallet', '1.02 USDC'],
-        ].map(([event, actor, amount]) => (
-          <li key={`${event}-${actor}`} className="flex items-center justify-between p-4 text-sm">
+        {metrics.activities.length === 0 && (
+          <li className="p-4 text-sm leading-6 text-ink-muted">
+            No paid unlocks or steers have settled yet.
+          </li>
+        )}
+        {metrics.activities.map((activity) => (
+          <li key={activity.id} className="flex items-center justify-between p-4 text-sm">
             <span>
-              <span className="font-mono text-accent">{event}</span> - {actor}
+              <span className="font-mono text-accent">{activity.label}</span> -{' '}
+              {activity.actor}
             </span>
-            <span className="font-mono text-ink-muted">{amount}</span>
+            <span className="font-mono text-ink-muted">{activity.amount}</span>
           </li>
         ))}
       </ul>
@@ -1323,6 +1417,16 @@ function filterRoomsForSection(
 function shortId(value: string): string {
   if (value.length <= 18) return value
   return `${value.slice(0, 10)}...${value.slice(-8)}`
+}
+
+function formatUsdcAmount(value: number): string {
+  if (!Number.isFinite(value)) return '0.0000'
+  if (value === 0) return '0.0000'
+  if (value < 0.01) return value.toFixed(4)
+  return value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  })
 }
 
 function formatDate(value: number): string {

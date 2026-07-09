@@ -34,10 +34,17 @@ export default async function StudioHome({
       const txEvent = [...session.provenanceEvents]
         .reverse()
         .find((event) => event.data?.txHash || event.data?.transactionId)
+      const paidSteers = session.provenanceEvents.filter(
+        (event) => event.category === 'stream' || event.category === 'branch',
+      ).length
+      const unlockEvents = session.provenanceEvents.filter(
+        (event) => event.category === 'access',
+      ).length
       return {
         id: session.id,
         roomKind: session.matchState.roomKind,
         experienceType: session.matchState.experienceType,
+        status: session.matchState.status,
         label: session.matchState.experienceLabel,
         title:
           session.matchState.seedTitle ||
@@ -52,6 +59,15 @@ export default async function StudioHome({
         steerPriceUsdc: session.matchState.steerPriceUsdc ?? '0.0001',
         totalEarned: session.matchState.totalEarned,
         branches: session.matchState.branches?.length ?? 0,
+        paidSteers: Math.max(
+          paidSteers,
+          session.matchState.branches?.length ?? 0,
+        ),
+        unlocks: Math.max(
+          unlockEvents,
+          session.matchState.unlockedWallets?.length ?? 0,
+        ),
+        participants: session.participants,
         creatorWalletId: session.matchState.creatorWalletId,
         creatorAddress: session.matchState.creatorAddress,
         lastTxHash:
@@ -60,6 +76,7 @@ export default async function StudioHome({
             : typeof txEvent?.data?.transactionId === 'string'
               ? txEvent.data.transactionId
               : undefined,
+        provenanceEvents: session.provenanceEvents,
       }
     })
 

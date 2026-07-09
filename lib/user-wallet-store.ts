@@ -65,6 +65,7 @@ export async function getUserWallet(
   email: string,
 ): Promise<StoredUserWallet | undefined> {
   const normalized = normalizeEmail(email)
+  ensureLoadedFromDisk()
   const cached = walletsByEmail.get(normalized)
   if (cached) return cached
 
@@ -79,7 +80,6 @@ export async function getUserWallet(
     console.warn('[user-wallet-store] KV read failed, falling back to local file', err)
   }
 
-  ensureLoadedFromDisk()
   return walletsByEmail.get(normalized)
 }
 
@@ -106,8 +106,11 @@ export async function upsertUserWallet(
     await kvSetJson(walletKey(email), next)
   } catch (err) {
     console.warn('[user-wallet-store] KV write failed, falling back to local file', err)
-    saveAllToDisk()
   }
+  // Keep a local mirror even when KV succeeds. This prevents a fresh Circle
+  // wallet from being created for the same email if the remote KV is absent,
+  // rotated, or temporarily unreachable on a later server boot.
+  saveAllToDisk()
 
   return next
 }

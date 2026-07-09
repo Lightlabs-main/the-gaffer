@@ -81,8 +81,15 @@ export default function DecisionWindow({
       creatorAddress &&
       participantAddress.toLowerCase() === creatorAddress.toLowerCase(),
   )
+  const disabledReason = !walletReady
+    ? 'Login to get your Circle Arc wallet'
+    : !gatewayReady
+      ? 'Prepare wallet for x402 streaming'
+      : isCreatorWallet
+        ? 'Creator wallet cannot pay itself'
+        : null
   const canSettle = Boolean(
-    walletReady && gatewayReady && participantWalletId && !isCreatorWallet,
+    participantWalletId && !disabledReason,
   )
 
   async function submitSteer(optionId: string) {
@@ -173,12 +180,22 @@ export default function DecisionWindow({
                 disabled={!canSettle || isBusy}
                 className="mt-4 w-full rounded-sm bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
               >
-                {isBusy ? 'Settling on Arc...' : 'Settle 0.0001 USDC steer'}
+                {isBusy
+                  ? 'Settling on Arc...'
+                  : disabledReason ?? 'Settle 0.0001 USDC steer'}
               </button>
             </article>
           )
         })}
       </div>
+
+      {disabledReason && (
+        <p className="mt-3 rounded-sm border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-100">
+          {disabledReason === 'Creator wallet cannot pay itself'
+            ? 'You are viewing this room with the creator wallet. To prove a real paid steer, share the session link or sign in with a different funded reader account, then settle from that reader wallet.'
+            : disabledReason}
+        </p>
+      )}
 
       {!walletReady && (
         <p className="mt-3 rounded-sm border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-100">
