@@ -122,6 +122,10 @@ const roomKindBySection: Partial<Record<StudioSection, RoomKind>> = {
   'Story seeds': 'story-video',
 }
 
+function requiresCreatorSeed(roomKind: RoomKind) {
+  return roomKind === 'article' || roomKind === 'story-video'
+}
+
 function isSessionApiSummary(value: unknown): value is SessionApiSummary {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<SessionApiSummary>
@@ -399,9 +403,13 @@ function StudioHomeForm({
       setError('Login or sign up with email so Gaffer can attach your Circle Arc wallet.')
       throw new Error('Login or sign up with email so Gaffer can attach your Circle Arc wallet.')
     }
-    if (selectedFormat.roomKind === 'article' && !seedContent.trim()) {
-      setError('Paste the article body before launching.')
-      throw new Error('Paste the article body before launching.')
+    if (requiresCreatorSeed(selectedFormat.roomKind) && !seedContent.trim()) {
+      const message =
+        selectedFormat.roomKind === 'story-video'
+          ? 'Write the story seed before launching.'
+          : 'Paste the article body before launching.'
+      setError(message)
+      throw new Error(message)
     }
     setCreating(true)
     setError(null)
@@ -448,7 +456,7 @@ function StudioHomeForm({
     }
   }
 
-  const needsArticle = selectedFormat.roomKind === 'article'
+  const needsSeedContent = requiresCreatorSeed(selectedFormat.roomKind)
   const canLaunch = Boolean(
     !creating &&
       signedIn &&
@@ -456,7 +464,7 @@ function StudioHomeForm({
       awayTeamName.trim() &&
       accessPriceUsdc.trim() &&
       steerPriceUsdc.trim() &&
-      (!needsArticle || seedContent.trim()),
+      (!needsSeedContent || seedContent.trim()),
   )
 
   if (!signedIn) {
@@ -846,6 +854,7 @@ function RoomsSection(props: {
   onTrendTopicChange: (value: string) => void
 }) {
   const needsArticle = props.selectedFormat.roomKind === 'article'
+  const needsSeedContent = requiresCreatorSeed(props.selectedFormat.roomKind)
   const visiblePublishedRooms = filterRoomsForSection(props.rooms, props.activeSection)
   return (
     <div className="grid grid-cols-12 gap-6">
@@ -968,10 +977,11 @@ function RoomsSection(props: {
               }
               className="gaffer-input min-h-44 resize-y leading-6"
             />
-            {needsArticle && (
+            {needsSeedContent && (
               <span className="text-xs leading-5 text-ink-muted">
-                The article body is required. Gaffer will not replace it with a
-                generated sample.
+                {props.selectedFormat.roomKind === 'story-video'
+                  ? 'The story seed is required. Supporters unlock this before paying to generate storyboard-video branches.'
+                  : 'The article body is required. Gaffer will not replace it with a generated sample.'}
               </span>
             )}
           </label>
@@ -1007,12 +1017,16 @@ function RoomsSection(props: {
           emptyCopy={
             props.activeSection === 'Articles'
               ? 'No article rooms yet. Paste an article above, publish it, and it will appear here.'
+              : props.activeSection === 'Story seeds'
+                ? 'No story-video seeds yet. Write a seed above, publish it, and it will appear here.'
               : 'No rooms in this section yet.'
           }
           rooms={visiblePublishedRooms}
           title={
             props.activeSection === 'Articles'
               ? 'Published articles'
+              : props.activeSection === 'Story seeds'
+                ? 'Published story-video seeds'
               : `Published ${props.activeSection.toLowerCase()}`
           }
         />

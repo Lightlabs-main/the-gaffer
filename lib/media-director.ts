@@ -64,7 +64,7 @@ function buildSystemPrompt(roomKind: MatchState['roomKind']): string {
     return `${base} For live video, body should be a short creator-facing director cue: what to say, ask, or do next. scenes should be an empty array.`
   }
   if (roomKind === 'story-video') {
-    return `${base} For story video, create a storyboard-video branch. Include 4 scenes, each with title, visual, caption. Body should be a 45-second narration script. Keep the JSON compact.`
+    return `${base} For story video, create a production-ready storyboard-video branch for a short vertical video. Include exactly 4 scenes, each with title, a concrete visual direction, and a caption. Body should be a 45-second voiceover script with pacing notes. Make the branch visibly different from the creator seed while preserving the original premise. Keep the JSON compact.`
   }
   return `${base} For article/story, write a strong alternate branch or angle. Body should be 350-500 words. scenes should be an empty array. Keep the JSON compact.`
 }

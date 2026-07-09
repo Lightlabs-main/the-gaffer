@@ -150,6 +150,7 @@ export default function MediaRoom({
           <RoomAccessPanel
             address={walletAddress}
             error={walletError}
+            roomKind={matchState.roomKind}
             status={walletStatus}
             unlocked={unlocked}
           />
@@ -175,14 +176,13 @@ function LockedRoomPanel({
     <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="rounded-sm border border-rule bg-card p-5">
         <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-accent">
-          Creator article
+          {lockedRoomEyebrow(matchState.roomKind)}
         </p>
         <h2 className="mt-2 text-2xl font-semibold text-ink">
-          Unlock the article, then steer your own version
+          {lockedRoomTitle(matchState.roomKind)}
         </h2>
         <p className="mt-3 text-sm leading-6 text-ink-muted">
-          The creator seed is gated. Once unlocked, you can read it and pay to
-          create your own branch, rebuttal, continuation, or live cue.
+          {lockedRoomCopy(matchState.roomKind)}
         </p>
         <div className="mt-5 rounded-sm border border-rule bg-secondary p-4">
           <div className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">
@@ -200,17 +200,19 @@ function LockedRoomPanel({
         <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-accent">
           Start here
         </p>
-        <h2 className="mt-2 text-2xl font-semibold text-ink">Steer this article after unlock</h2>
+        <h2 className="mt-2 text-2xl font-semibold text-ink">
+          {lockedSteerTitle(matchState.roomKind)}
+        </h2>
         <div className="mt-5 grid gap-3">
           <StepCard
             label="Step 1"
             title={`Unlock for ${matchState.accessPriceUsdc ?? '0.0001'} USDC`}
-            body="Read the creator's article, video seed, or room brief."
+            body={unlockStepCopy(matchState.roomKind)}
           />
           <StepCard
             label="Step 2"
             title={`Steer for ${matchState.steerPriceUsdc ?? '0.0001'} USDC`}
-            body="Submit your scenario and generate a paid branch."
+            body={steerStepCopy(matchState.roomKind)}
           />
         </div>
         <div className="mt-4 rounded-sm border border-rule bg-secondary p-3">
@@ -237,7 +239,7 @@ function LockedRoomPanel({
           disabled={!walletReady || busy}
           className="mt-5 w-full rounded-sm bg-ink px-5 py-4 text-sm font-medium text-paper disabled:cursor-not-allowed disabled:opacity-45"
         >
-          {busy ? 'Settling unlock...' : 'Unlock article and steering'}
+          {busy ? 'Settling unlock...' : unlockButtonCopy(matchState.roomKind)}
         </button>
         {!walletReady && (
           <p className="mt-3 text-xs leading-5 text-ink-muted">
@@ -291,7 +293,7 @@ function SeedPanel({ matchState }: { matchState: MatchState }) {
             Original creator seed
           </p>
           <h2 className="mt-1 text-2xl font-semibold text-ink">
-            {matchState.roomKind === 'article' ? 'Read the writer article' : 'Read the seed'}
+            {seedPanelTitle(matchState.roomKind)}
           </h2>
         </div>
         <span className="rounded-full border border-rule px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-ink-muted">
@@ -326,7 +328,9 @@ function SteerPanel({
         <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-accent">
           User action
         </p>
-        <h2 className="mt-2 text-3xl font-semibold text-ink">Steer this article</h2>
+        <h2 className="mt-2 text-3xl font-semibold text-ink">
+          {steerPanelTitle(matchState.roomKind)}
+        </h2>
         <p className="mt-2 text-sm leading-6 text-ink-muted">
           {steerCopy(matchState.roomKind)}
         </p>
@@ -388,11 +392,13 @@ function BranchList({
     return (
       <section className="rounded-sm border border-rule bg-card p-5">
         <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
-          Crowd branches
+          {branchListEyebrow(roomKind)}
         </p>
-        <h2 className="mt-2 text-xl font-semibold text-ink">No one has steered yet</h2>
+        <h2 className="mt-2 text-xl font-semibold text-ink">
+          {emptyBranchTitle(roomKind)}
+        </h2>
         <p className="mt-2 text-sm leading-6 text-ink-muted">
-          Paid branches and AI director outputs will appear here after the first user steer.
+          {emptyBranchCopy(roomKind)}
         </p>
       </section>
     )
@@ -403,9 +409,11 @@ function BranchList({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
-            Crowd branches
+            {branchListEyebrow(roomKind)}
           </p>
-          <h2 className="mt-1 text-2xl font-semibold text-ink">What users steered</h2>
+          <h2 className="mt-1 text-2xl font-semibold text-ink">
+            {branchListTitle(roomKind)}
+          </h2>
         </div>
         <span className="rounded-full border border-rule px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-ink-muted">
           {branches.length} total
@@ -440,7 +448,7 @@ function BranchList({
                   <div className="aspect-video bg-[radial-gradient(circle_at_30%_20%,rgba(255,107,92,0.32),transparent_30%),linear-gradient(135deg,#140f12,#1f2937)] p-4">
                     <div className="flex h-full flex-col justify-between">
                       <span className="font-mono text-xs text-accent">
-                        Scene {index + 1}
+                        Storyboard frame {index + 1}
                       </span>
                       <p className="text-sm font-semibold">{scene.visual}</p>
                     </div>
@@ -488,11 +496,13 @@ function Stat({ label, value }: { label: string; value: string }) {
 function RoomAccessPanel({
   address,
   error,
+  roomKind,
   status,
   unlocked,
 }: {
   address: string | null
   error: string | null
+  roomKind: MatchState['roomKind']
   status: 'loading' | 'ready' | 'error'
   unlocked: boolean
 }) {
@@ -511,7 +521,7 @@ function RoomAccessPanel({
         Reader access
       </p>
       <h2 className="mt-2 text-lg font-semibold text-ink">
-        {unlocked ? 'Article unlocked' : 'Unlock required'}
+        {unlocked ? `${contentLabel(roomKind)} unlocked` : 'Unlock required'}
       </h2>
       <p className="mt-2 text-sm leading-6 text-ink-muted">
         {status === 'ready'
@@ -549,6 +559,97 @@ function RoomAccessPanel({
       )}
     </section>
   )
+}
+
+function contentLabel(roomKind: MatchState['roomKind']) {
+  if (roomKind === 'live-video') return 'Live room'
+  if (roomKind === 'story-video') return 'Story seed'
+  return 'Article'
+}
+
+function lockedRoomEyebrow(roomKind: MatchState['roomKind']) {
+  if (roomKind === 'live-video') return 'Creator live room'
+  if (roomKind === 'story-video') return 'Creator story seed'
+  return 'Creator article'
+}
+
+function lockedRoomTitle(roomKind: MatchState['roomKind']) {
+  if (roomKind === 'live-video') return 'Unlock the live room, then steer the show'
+  if (roomKind === 'story-video') return 'Unlock the story seed, then generate your branch'
+  return 'Unlock the article, then steer your own version'
+}
+
+function lockedRoomCopy(roomKind: MatchState['roomKind']) {
+  if (roomKind === 'live-video') {
+    return 'The creator live room is gated. Once unlocked, you can watch and pay to send director cues, prompts, or audience questions.'
+  }
+  if (roomKind === 'story-video') {
+    return 'The creator story seed is gated. Once unlocked, you can read the premise and pay to generate your own storyboard-video branch.'
+  }
+  return 'The creator article is gated. Once unlocked, you can read it and pay to create your own branch, rebuttal, continuation, or alternate angle.'
+}
+
+function lockedSteerTitle(roomKind: MatchState['roomKind']) {
+  if (roomKind === 'live-video') return 'Steer this live room after unlock'
+  if (roomKind === 'story-video') return 'Generate a story-video branch after unlock'
+  return 'Steer this article after unlock'
+}
+
+function unlockStepCopy(roomKind: MatchState['roomKind']) {
+  if (roomKind === 'live-video') return 'Enter the creator live room and see the room brief.'
+  if (roomKind === 'story-video') return 'Read the creator story seed, world, and premise.'
+  return "Read the creator's full article."
+}
+
+function steerStepCopy(roomKind: MatchState['roomKind']) {
+  if (roomKind === 'live-video') return 'Send a paid cue for the live creator or AI director.'
+  if (roomKind === 'story-video') return 'Submit your scenario and generate a storyboard-video branch.'
+  return 'Submit your scenario and generate a paid article branch.'
+}
+
+function unlockButtonCopy(roomKind: MatchState['roomKind']) {
+  if (roomKind === 'live-video') return 'Unlock live room and steering'
+  if (roomKind === 'story-video') return 'Unlock story seed and steering'
+  return 'Unlock article and steering'
+}
+
+function seedPanelTitle(roomKind: MatchState['roomKind']) {
+  if (roomKind === 'story-video') return 'Read the story seed'
+  return 'Read the writer article'
+}
+
+function steerPanelTitle(roomKind: MatchState['roomKind']) {
+  if (roomKind === 'live-video') return 'Steer this live room'
+  if (roomKind === 'story-video') return 'Generate your story-video branch'
+  return 'Steer this article'
+}
+
+function branchListEyebrow(roomKind: MatchState['roomKind']) {
+  if (roomKind === 'live-video') return 'Director cues'
+  if (roomKind === 'story-video') return 'Storyboard branches'
+  return 'Crowd branches'
+}
+
+function emptyBranchTitle(roomKind: MatchState['roomKind']) {
+  if (roomKind === 'live-video') return 'No live cues yet'
+  if (roomKind === 'story-video') return 'No story branches yet'
+  return 'No one has steered yet'
+}
+
+function emptyBranchCopy(roomKind: MatchState['roomKind']) {
+  if (roomKind === 'live-video') {
+    return 'Paid audience cues and AI director responses will appear here after the first live steer.'
+  }
+  if (roomKind === 'story-video') {
+    return 'Paid storyboard-video branches will appear here after the first supporter generates a scenario.'
+  }
+  return 'Paid branches and AI director outputs will appear here after the first user steer.'
+}
+
+function branchListTitle(roomKind: MatchState['roomKind']) {
+  if (roomKind === 'live-video') return 'What viewers steered'
+  if (roomKind === 'story-video') return 'Generated story-video paths'
+  return 'What users steered'
 }
 
 function roomEyebrow(roomKind: MatchState['roomKind']) {
