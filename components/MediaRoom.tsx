@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import CircleAccountPanel from './CircleAccountPanel'
 import ProvenancePanel from './ProvenancePanel'
 import type { MatchState, MediaBranch, ProvenanceEvent } from '@/lib/types'
@@ -439,27 +439,7 @@ function BranchList({
             </p>
           )}
           {roomKind === 'story-video' && branch.scenes?.length ? (
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              {branch.scenes.map((scene, index) => (
-                <div
-                  key={`${branch.id}-${index}`}
-                  className="overflow-hidden rounded-lg border border-zinc-200 bg-zinc-950 text-white"
-                >
-                  <div className="aspect-video bg-[radial-gradient(circle_at_30%_20%,rgba(255,107,92,0.32),transparent_30%),linear-gradient(135deg,#140f12,#1f2937)] p-4">
-                    <div className="flex h-full flex-col justify-between">
-                      <span className="font-mono text-xs text-accent">
-                        Storyboard frame {index + 1}
-                      </span>
-                      <p className="text-sm font-semibold">{scene.visual}</p>
-                    </div>
-                  </div>
-                  <div className="p-3">
-                    <div className="text-sm font-semibold">{scene.title}</div>
-                    <p className="mt-1 text-xs leading-5 text-zinc-300">{scene.caption}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <StoryboardVideoPlayer branch={branch} />
           ) : null}
           <div className="mt-4 whitespace-pre-wrap rounded-sm border border-rule bg-secondary p-4 text-sm leading-7 text-ink-muted">
             {branch.body}
@@ -467,6 +447,79 @@ function BranchList({
         </article>
       ))}
     </section>
+  )
+}
+
+function StoryboardVideoPlayer({ branch }: { branch: MediaBranch }) {
+  const scenes = branch.scenes ?? []
+  const [active, setActive] = useState(0)
+  const activeScene = scenes[active] ?? scenes[0]
+
+  useEffect(() => {
+    if (scenes.length < 2) return
+    const timer = window.setInterval(() => {
+      setActive((current) => (current + 1) % scenes.length)
+    }, 2800)
+    return () => window.clearInterval(timer)
+  }, [scenes.length])
+
+  if (!activeScene) return null
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-sm border border-rule bg-zinc-950 text-white shadow-2xl">
+      <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+        <div>
+          <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-accent">
+            AI story video preview
+          </p>
+          <h4 className="mt-1 text-sm font-semibold">{branch.title}</h4>
+        </div>
+        <span className="rounded-full border border-white/15 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-zinc-300">
+          Auto playing
+        </span>
+      </div>
+      <div className="relative aspect-video overflow-hidden bg-[radial-gradient(circle_at_20%_10%,rgba(255,107,92,0.38),transparent_24%),radial-gradient(circle_at_80%_15%,rgba(255,205,65,0.22),transparent_18%),linear-gradient(135deg,#07080d,#171923_46%,#0b1014)]">
+        <div className="absolute inset-0 opacity-35 [background-image:linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:42px_42px]" />
+        <div className="absolute inset-0 flex flex-col justify-between p-5">
+          <div className="flex items-start justify-between gap-4">
+            <span className="rounded-full bg-black/45 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-zinc-200">
+              Scene {active + 1} / {scenes.length}
+            </span>
+            <span className="rounded-full bg-red-500 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-white">
+              Generated
+            </span>
+          </div>
+          <div className="max-w-2xl">
+            <h5 className="text-2xl font-semibold leading-tight">{activeScene.title}</h5>
+            <p className="mt-3 text-lg leading-8 text-zinc-100">{activeScene.visual}</p>
+          </div>
+          <div className="rounded-sm bg-black/55 p-3 text-sm leading-6 text-zinc-100 backdrop-blur">
+            {activeScene.caption}
+          </div>
+        </div>
+      </div>
+      <div className="grid gap-2 border-t border-white/10 p-3 sm:grid-cols-4">
+        {scenes.map((scene, index) => (
+          <button
+            key={`${branch.id}-scene-${index}`}
+            type="button"
+            onClick={() => setActive(index)}
+            className={`rounded-sm border p-3 text-left transition ${
+              index === active
+                ? 'border-accent bg-white text-black'
+                : 'border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10'
+            }`}
+          >
+            <span className="font-mono text-[10px] uppercase tracking-widest">
+              Frame {index + 1}
+            </span>
+            <span className="mt-1 line-clamp-2 block text-xs font-semibold">
+              {scene.title}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
 
