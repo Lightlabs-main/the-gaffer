@@ -117,6 +117,11 @@ export interface MediaBranchScene {
   title: string
   visual: string
   caption: string
+  sceneNumber?: number | string
+  chapterTitle?: string
+  narration?: string
+  visualDescription?: string
+  imagePrompt?: string
 }
 
 export interface MediaBranch {

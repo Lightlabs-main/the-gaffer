@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import CircleAccountPanel from './CircleAccountPanel'
 import ProvenancePanel from './ProvenancePanel'
-import type { MatchState, MediaBranch, ProvenanceEvent } from '@/lib/types'
+import type { MatchState, MediaBranch, MediaBranchScene, ProvenanceEvent } from '@/lib/types'
 
 interface Props {
   sessionId: string
@@ -329,23 +329,50 @@ function StorySeedReelPreview({ matchState }: { matchState: MatchState }) {
       <div className="grid gap-5 lg:grid-cols-[minmax(260px,390px)_1fr]">
         <div className="mx-auto w-full max-w-[390px]">
           <AnimeReelFrame
-            eyebrow="Seed episode"
+            eyebrow="Cinematic seed"
             title={matchState.seedTitle ?? matchState.homeTeam.name}
-            caption={reelCaptionFromText(matchState.seedContent, matchState.seedTopic)}
+            caption={matchState.seedTitle ?? 'Story seed ready'}
             footer={matchState.seedTopic ?? matchState.awayTeam.name}
             sceneIndex={1}
             sceneTotal={1}
             tone="romance"
           />
         </div>
-        <div className="flex min-w-0 flex-col rounded-sm border border-rule bg-secondary p-4">
-          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
-            Story seed
-          </p>
-          <h3 className="mt-2 text-xl font-semibold text-ink">{matchState.seedTitle}</h3>
-          <p className="mt-2 text-sm leading-6 text-ink-muted">{matchState.seedTopic}</p>
-          <div className="mt-4 max-h-[520px] overflow-y-auto whitespace-pre-wrap rounded-sm border border-rule bg-card p-4 text-sm leading-7 text-ink">
-            {matchState.seedContent}
+        <div className="grid min-w-0 content-start gap-4">
+          <div className="rounded-sm border border-rule bg-secondary p-4">
+            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
+              Cinematic generator
+            </p>
+            <h3 className="mt-2 text-xl font-semibold text-ink">
+              The next steer becomes a full image-story series.
+            </h3>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              {[
+                'Story title and overview',
+                'Main character bible',
+                'Chapter structure',
+                'Scene narration',
+                'Visual descriptions',
+                'Image generation prompts',
+              ].map((item) => (
+                <div
+                  key={item}
+                  className="rounded-sm border border-rule bg-card px-3 py-2 text-xs font-semibold text-ink"
+                >
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="flex min-w-0 flex-col rounded-sm border border-rule bg-secondary p-4">
+            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
+              Story seed
+            </p>
+            <h3 className="mt-2 text-xl font-semibold text-ink">{matchState.seedTitle}</h3>
+            <p className="mt-2 text-sm leading-6 text-ink-muted">{matchState.seedTopic}</p>
+            <div className="mt-4 max-h-[360px] overflow-y-auto whitespace-pre-wrap rounded-sm border border-rule bg-card p-4 text-sm leading-7 text-ink">
+              {matchState.seedContent}
+            </div>
           </div>
         </div>
       </div>
@@ -516,47 +543,76 @@ function StoryboardVideoPlayer({ branch }: { branch: MediaBranch }) {
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-accent">
-            AI story reel
+            Cinematic image-story series
           </p>
           <h4 className="mt-1 text-sm font-semibold">{branch.title}</h4>
         </div>
         <span className="rounded-full border border-white/15 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-zinc-300">
-          Auto playing
+          {active + 1}/{scenes.length}
         </span>
       </div>
       <div className="grid gap-5 lg:grid-cols-[minmax(260px,390px)_1fr]">
         <div className="mx-auto w-full max-w-[390px]">
           <AnimeReelFrame
-            eyebrow="Generated episode"
+            eyebrow={activeScene.chapterTitle || 'Generated episode'}
             title={activeScene.title}
-            caption={activeScene.caption || activeScene.visual}
-            footer={activeScene.visual}
+            caption={shortReelText(sceneNarration(activeScene))}
+            footer={sceneVisual(activeScene)}
             sceneIndex={active + 1}
             sceneTotal={scenes.length}
             tone={active % 2 === 0 ? 'romance' : 'shadow'}
           />
         </div>
         <div className="grid content-start gap-3">
-          {scenes.map((scene, index) => (
-            <button
-              key={`${branch.id}-scene-${index}`}
-              type="button"
-              onClick={() => setActive(index)}
-              className={`rounded-sm border p-3 text-left transition ${
-                index === active
-                  ? 'border-accent bg-white text-black'
-                  : 'border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10'
-              }`}
-            >
-              <span className="font-mono text-[10px] uppercase tracking-widest">
-                Frame {index + 1}
-              </span>
-              <span className="mt-1 block text-sm font-semibold">{scene.title}</span>
-              <span className="mt-1 line-clamp-2 block text-xs leading-5 opacity-80">
-                {scene.caption || scene.visual}
-              </span>
-            </button>
-          ))}
+          <div className="rounded-sm border border-white/10 bg-white/5 p-4">
+            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
+              Scene narration
+            </p>
+            <h5 className="mt-2 text-lg font-semibold text-white">{activeScene.title}</h5>
+            <p className="mt-3 text-sm leading-7 text-zinc-200">
+              {sceneNarration(activeScene)}
+            </p>
+          </div>
+          <div className="rounded-sm border border-white/10 bg-white/5 p-4">
+            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
+              Visual description
+            </p>
+            <p className="mt-3 text-sm leading-7 text-zinc-300">
+              {sceneVisual(activeScene)}
+            </p>
+          </div>
+          {sceneImagePrompt(activeScene) ? (
+            <div className="rounded-sm border border-white/10 bg-black/35 p-4">
+              <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
+                Image generation prompt
+              </p>
+              <p className="mt-3 whitespace-pre-wrap font-mono text-[11px] leading-6 text-zinc-300">
+                {sceneImagePrompt(activeScene)}
+              </p>
+            </div>
+          ) : null}
+          <div className="grid max-h-[360px] gap-2 overflow-y-auto pr-1">
+            {scenes.map((scene, index) => (
+              <button
+                key={`${branch.id}-scene-${index}`}
+                type="button"
+                onClick={() => setActive(index)}
+                className={`rounded-sm border p-3 text-left transition ${
+                  index === active
+                    ? 'border-accent bg-white text-black'
+                    : 'border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10'
+                }`}
+              >
+                <span className="font-mono text-[10px] uppercase tracking-widest">
+                  Scene {scene.sceneNumber ?? index + 1}
+                </span>
+                <span className="mt-1 block text-sm font-semibold">{scene.title}</span>
+                <span className="mt-1 line-clamp-2 block text-xs leading-5 opacity-80">
+                  {sceneNarration(scene)}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -615,7 +671,7 @@ function AnimeReelFrame({
           {title}
         </p>
         <p
-          className="mt-3 text-2xl font-black leading-tight text-white sm:text-3xl"
+          className="mt-3 text-xl font-black leading-tight text-white sm:text-2xl"
           style={{ textShadow: '0 3px 12px rgba(0,0,0,0.9)' }}
         >
           {caption}
@@ -635,6 +691,28 @@ function ReelAction({ label, symbol }: { label: string; symbol: string }) {
       <span className="text-[11px] font-semibold">{label}</span>
     </div>
   )
+}
+
+function sceneNarration(scene: MediaBranchScene) {
+  return scene.narration || scene.caption || 'A cinematic moment moves the story forward.'
+}
+
+function sceneVisual(scene: MediaBranchScene) {
+  return (
+    scene.visualDescription ||
+    scene.visual ||
+    'A movie-quality image frame with emotional character detail.'
+  )
+}
+
+function sceneImagePrompt(scene: MediaBranchScene) {
+  return scene.imagePrompt || ''
+}
+
+function shortReelText(text: string) {
+  const trimmed = text.replace(/^NARRATION:\s*/i, '').trim()
+  if (trimmed.length <= 180) return trimmed
+  return `${trimmed.slice(0, 177).trim()}...`
 }
 
 function reelCaptionFromText(text: string | undefined, fallback: string | undefined) {
@@ -796,7 +874,7 @@ function seedPanelTitle(roomKind: MatchState['roomKind']) {
 
 function steerPanelTitle(roomKind: MatchState['roomKind']) {
   if (roomKind === 'live-video') return 'Steer this live room'
-  if (roomKind === 'story-video') return 'Generate your story-video branch'
+  if (roomKind === 'story-video') return 'Generate a cinematic story series'
   return 'Steer this article'
 }
 
@@ -839,14 +917,14 @@ function steerCopy(roomKind: MatchState['roomKind']) {
     return 'Pay to send the AI director a cue for what the creator should do, answer, or explore next.'
   }
   if (roomKind === 'story-video') {
-    return 'Pay to generate your own storyboard-video branch from the creator seed.'
+    return 'Pay to generate a connected image-story branch with a title, overview, character bible, chapters, narration, visual direction, and image prompts.'
   }
   return 'Pay to create your own branch, rebuttal, continuation, or alternate angle from this article.'
 }
 
 function steerPlaceholder(roomKind: MatchState['roomKind']) {
   if (roomKind === 'live-video') return 'Ask the founder to explain the riskiest part, then turn it into a challenge...'
-  if (roomKind === 'story-video') return 'Make it a betrayal story where the agent sells the striker out...'
+  if (roomKind === 'story-video') return 'Genre: romantic fantasy anime. Visual style: cinematic anime. Chapters: 3. Make the heroine discover the villain is her fated protector, then build a suspenseful image-story series...'
   return 'Rewrite this from the opposite side, focused on creators in Lagos...'
 }
 
@@ -871,16 +949,19 @@ function steerPresets(roomKind: MatchState['roomKind']) {
   if (roomKind === 'story-video') {
     return [
       {
-        label: 'Make a darker version',
-        prompt: 'Generate a tense version where the main character discovers a hidden cost.',
+        label: 'Dark cinematic anime',
+        prompt:
+          'Genre: dark romantic fantasy. Visual style: cinematic anime. Chapters: 3. Create a connected image-story series where the heroine wounds the immortal villain and realizes he is the only person who has ever protected her.',
       },
       {
-        label: 'Turn it into a trailer',
-        prompt: 'Create a short cinematic trailer with three strong visual scenes.',
+        label: 'Trailer structure',
+        prompt:
+          'Genre: romantic suspense. Visual style: high-budget vertical anime trailer. Chapters: 3. Turn this into a trailer-like image-story series with emotional narration, character consistency, and image prompts for every scene.',
       },
       {
-        label: 'Localize the story',
-        prompt: 'Move the story into Lagos and make the stakes personal and visual.',
+        label: 'Lagos fantasy version',
+        prompt:
+          'Genre: supernatural romance. Visual style: cinematic anime set in Lagos at night. Chapters: 3. Rebuild the story with rain, neon streets, family pressure, and a dangerous secret romance.',
       },
     ]
   }

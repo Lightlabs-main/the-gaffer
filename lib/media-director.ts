@@ -16,7 +16,7 @@ export async function generateMediaBranch(opts: {
   const kind = branchKind(opts.matchState.roomKind)
   const response = await client.messages.create({
     model,
-    max_tokens: 1800,
+    max_tokens: kind === 'storyboard-video' ? 3600 : 1800,
     system: buildSystemPrompt(opts.matchState.roomKind),
     messages: [
       {
@@ -64,7 +64,39 @@ function buildSystemPrompt(roomKind: MatchState['roomKind']): string {
     return `${base} For live video, body should be a short creator-facing director cue: what to say, ask, or do next. scenes should be an empty array.`
   }
   if (roomKind === 'story-video') {
-    return `${base} For story video, create a production-ready storyboard-video branch for a short vertical video. Include exactly 4 scenes, each with title, a concrete visual direction, and a caption. Body should be a 45-second voiceover script with pacing notes. Make the branch visibly different from the creator seed while preserving the original premise. Keep the JSON compact.`
+    return `${base}
+
+For story video, you are an award-winning filmmaker, novelist, storyboard artist, and AI visual director.
+
+Your job is to create a complete cinematic image-story series that feels like a movie told through pictures.
+Do not create random images. Build a connected emotional story where every image continues from the previous one.
+
+The creator seed and paid steer are the user's idea. If genre, visual style, or chapter count are not explicit, infer them from the seed and steer. Default to 3 chapters and 8 image scenes total.
+
+Return valid compact JSON only:
+{
+  "title": "Powerful memorable story title",
+  "summary": "Short overview explaining the main conflict, emotions, and journey",
+  "body": "Structured story bible with sections: STORY TITLE, STORY OVERVIEW, MAIN CHARACTERS, STORY STRUCTURE. Character profiles must include name, age, personality, background, facial features, hair style, body type, clothing style, and unique details. Chapter notes must include chapter title, what happens, and emotional purpose.",
+  "scenes": [
+    {
+      "sceneNumber": 1,
+      "chapterTitle": "Chapter 1 - ...",
+      "title": "Scene 1 - ...",
+      "caption": "NARRATION: exact emotional narrator text that appears with this image",
+      "visual": "VISUAL DESCRIPTION: character actions, facial expressions, emotions, location, background details, important objects, and atmosphere",
+      "imagePrompt": "IMAGE GENERATION PROMPT: repeat character consistency details, clothing, facial features, pose, camera angle, cinematic lighting, realistic environment or requested style, mood, movie-quality composition"
+    }
+  ]
+}
+
+Rules:
+- Every scene must connect smoothly to the previous scene.
+- Characters must remain visually identical across every chapter and every image. Repeat consistency details in every imagePrompt.
+- Every image must reveal emotion, conflict, mystery, or progress.
+- Avoid boring scenes and random changes.
+- Make it feel like a premium cinematic visual story series.
+- Keep body concise enough for a web UI, but make scenes detailed and directly usable for image generation.`
   }
   return `${base} For article/story, write a strong alternate branch or angle. Body should be 350-500 words. scenes should be an empty array. Keep the JSON compact.`
 }
@@ -80,7 +112,7 @@ function buildUserPrompt(matchState: MatchState, prompt: string): string {
     `Paid steer from audience/user: ${prompt}`,
     ``,
     `Return JSON exactly like:`,
-    `{"title":"...","summary":"...","body":"...","scenes":[{"title":"...","visual":"...","caption":"..."}]}`,
+    `{"title":"...","summary":"...","body":"...","scenes":[{"sceneNumber":1,"chapterTitle":"...","title":"...","caption":"...","visual":"...","imagePrompt":"..."}]}`,
   ].join('\n')
 }
 
@@ -88,7 +120,7 @@ function parseBranchJson(text: string): {
   title: string
   summary: string
   body: string
-  scenes: { title: string; visual: string; caption: string }[]
+  scenes: NonNullable<MediaBranch['scenes']>
 } {
   const jsonText = text.replace(/^```json\s*/i, '').replace(/```$/i, '').trim()
   try {
@@ -96,16 +128,33 @@ function parseBranchJson(text: string): {
       title?: string
       summary?: string
       body?: string
-      scenes?: { title?: string; visual?: string; caption?: string }[]
+      scenes?: {
+        sceneNumber?: number | string
+        chapterTitle?: string
+        title?: string
+        visual?: string
+        visualDescription?: string
+        caption?: string
+        narration?: string
+        imagePrompt?: string
+      }[]
     }
     return {
       title: parsed.title || 'Untitled branch',
       summary: parsed.summary || 'A paid audience branch was generated.',
       body: parsed.body || jsonText,
-      scenes: (parsed.scenes ?? []).slice(0, 6).map((scene, index) => ({
+      scenes: (parsed.scenes ?? []).slice(0, 10).map((scene, index) => ({
+        sceneNumber: scene.sceneNumber ?? index + 1,
+        chapterTitle: scene.chapterTitle,
         title: scene.title || `Scene ${index + 1}`,
-        visual: scene.visual || 'A cinematic story frame',
-        caption: scene.caption || '',
+        visual:
+          scene.visualDescription ||
+          scene.visual ||
+          'A cinematic story frame',
+        caption: scene.narration || scene.caption || '',
+        narration: scene.narration || scene.caption || '',
+        visualDescription: scene.visualDescription || scene.visual || '',
+        imagePrompt: scene.imagePrompt || '',
       })),
     }
   } catch {
