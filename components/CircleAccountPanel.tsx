@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import {
   clearProfileIdentity,
   readProfileIdentity,
+  refreshProfileIdentityFromServer,
   saveProfileIdentity,
   shortAddress,
   type ProfileIdentity,
@@ -33,14 +34,32 @@ export default function CircleAccountPanel({
   )
 
   useEffect(() => {
+    let cancelled = false
     function refreshIdentity() {
       const current = readProfileIdentity()
       setIdentity(current?.loginProvider === 'email' ? current : null)
       if (current?.email) setEmail(current.email)
     }
+    async function refreshCanonicalIdentity() {
+      const current = readProfileIdentity()
+      if (current?.loginProvider !== 'email') return
+      try {
+        const canonical = await refreshProfileIdentityFromServer(current)
+        if (!cancelled && canonical?.loginProvider === 'email') {
+          setIdentity(canonical)
+          setEmail(canonical.email)
+        }
+      } catch {
+        // Keep the local identity visible; explicit login will surface errors.
+      }
+    }
     refreshIdentity()
+    void refreshCanonicalIdentity()
     window.addEventListener('gaffer-auth-changed', refreshIdentity)
-    return () => window.removeEventListener('gaffer-auth-changed', refreshIdentity)
+    return () => {
+      cancelled = true
+      window.removeEventListener('gaffer-auth-changed', refreshIdentity)
+    }
   }, [])
 
   async function login() {

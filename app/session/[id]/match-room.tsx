@@ -18,6 +18,7 @@ import MediaRoom from '@/components/MediaRoom'
 import {
   hasCircleProfileIdentity,
   readProfileIdentity,
+  refreshProfileIdentityFromServer,
   upsertProfileMatch,
 } from '@/lib/client-profile'
 import type { MatchState, ProvenanceEvent } from '@/lib/types'
@@ -116,13 +117,17 @@ export default function MatchRoom({ sessionId, initialSession = null }: Props) {
         if (!identity || identity.loginProvider !== 'email') {
           throw new Error('Login with email so Gaffer can create your Circle Arc wallet.')
         }
+        const canonicalIdentity = await refreshProfileIdentityFromServer(identity)
+        if (!canonicalIdentity || canonicalIdentity.loginProvider !== 'email') {
+          throw new Error('Could not refresh your Circle Arc wallet.')
+        }
         const res = await fetch('/api/wallet/participant', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             sessionId,
-            walletId: identity.walletId,
-            address: identity.address,
+            walletId: canonicalIdentity.walletId,
+            address: canonicalIdentity.address,
           }),
         })
         if (cancelled) return

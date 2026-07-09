@@ -135,6 +135,41 @@ export function saveProfileIdentity(identity: ProfileIdentity) {
   writeIdentityCookie(identity)
 }
 
+export async function refreshProfileIdentityFromServer(
+  identity = readProfileIdentity(),
+): Promise<ProfileIdentity | null> {
+  if (typeof window === 'undefined') return identity
+  if (!identity?.email || identity.loginProvider !== 'email') return identity
+
+  const res = await fetch('/api/wallet/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: identity.email }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(data.message || data.error || 'Wallet refresh failed')
+  }
+
+  const nextIdentity: ProfileIdentity = {
+    ...identity,
+    email: identity.email.trim().toLowerCase(),
+    loginLabel: identity.loginLabel ?? identity.email.trim().toLowerCase(),
+    loginProvider: 'email',
+    walletId: data.walletId,
+    address: data.address,
+    balance: data.balance ?? identity.balance ?? '0',
+    balanceRaw: data.balanceRaw ?? identity.balanceRaw ?? '0',
+    fundingTransactionId: data.fundingTransactionId ?? identity.fundingTransactionId,
+    fundingWarning: data.fundingWarning ?? undefined,
+    chainId: data.chainId ?? identity.chainId ?? 5042002,
+    asset: data.asset ?? identity.asset ?? 'USDC (Arc Testnet)',
+  }
+
+  saveProfileIdentity(nextIdentity)
+  return nextIdentity
+}
+
 export function clearProfileIdentity() {
   if (typeof window === 'undefined') return
   window.localStorage.removeItem(PROFILE_IDENTITY_KEY)
