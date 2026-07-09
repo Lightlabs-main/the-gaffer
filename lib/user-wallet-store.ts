@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Address } from 'viem'
-import { kvGetJson, kvSetJson } from './persistent-kv'
+import { hasPersistentKv, kvGetJson, kvSetJson } from './persistent-kv'
 
 export interface StoredUserWallet {
   email: string
@@ -21,6 +21,7 @@ const STORE_DIR = join(process.cwd(), '.gaffer-store')
 const STORE_FILE = join(STORE_DIR, 'user-wallets.json')
 const walletsByEmail = new Map<string, StoredUserWallet>()
 let loadedFromDisk = false
+let diskWritable: boolean | undefined
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase()
@@ -59,6 +60,28 @@ function saveAllToDisk(): void {
   } catch (err) {
     console.warn('[user-wallet-store] could not persist wallets', err)
   }
+}
+
+function canPersistToDisk(): boolean {
+  if (diskWritable !== undefined) return diskWritable
+  try {
+    mkdirSync(STORE_DIR, { recursive: true })
+    const probeFile = join(STORE_DIR, '.write-test')
+    writeFileSync(probeFile, 'ok')
+    diskWritable = true
+  } catch {
+    diskWritable = false
+  }
+  return diskWritable
+}
+
+export function hasDurableUserWalletStore(): boolean {
+  if (hasPersistentKv()) return true
+  // Vercel serverless storage is not durable across cold starts. If this route
+  // is running on Vercel, /api was not proxied to the VPS and wallet creation
+  // would rotate addresses, so block it instead.
+  if (process.env.VERCEL === '1') return false
+  return canPersistToDisk()
 }
 
 export async function getUserWallet(

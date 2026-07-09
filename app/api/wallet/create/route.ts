@@ -6,6 +6,7 @@
  */
 import { NextResponse } from 'next/server'
 import { createOrGetWalletForEmail } from '@/lib/wallet-login'
+import { hasDurableUserWalletStore } from '@/lib/user-wallet-store'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,6 +42,15 @@ export async function POST(req: Request): Promise<NextResponse> {
     const email = body.email?.trim().toLowerCase()
     if (!email) {
       return NextResponse.json({ message: 'email is required' }, { status: 400 })
+    }
+    if (!hasDurableUserWalletStore()) {
+      return NextResponse.json(
+        {
+          message:
+            'Stable wallet storage is not available on this deployment. Set GAFFER_BACKEND_ORIGIN to the VPS backend or add Vercel KV before creating wallets.',
+        },
+        { status: 503 },
+      )
     }
 
     stage = 'login'
