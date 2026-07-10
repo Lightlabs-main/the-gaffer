@@ -675,7 +675,7 @@ function AnimeReelFrame({
   const renderedImageUrl =
     imageUrl ||
     (imagePrompt
-      ? `/api/story/image?prompt=${encodeURIComponent(imagePrompt)}&seed=${sceneIndex}`
+      ? `/api/story/image?prompt=${encodeURIComponent(imagePrompt.slice(0, 1800))}&seed=${sceneIndex}`
       : '')
   return (
     <div className="relative aspect-[9/16] overflow-hidden rounded-[28px] border border-white/15 bg-zinc-950 shadow-2xl">
