@@ -312,6 +312,14 @@ function SeedPanel({ matchState }: { matchState: MatchState }) {
 }
 
 function StorySeedReelPreview({ matchState }: { matchState: MatchState }) {
+  const seedImagePrompt = [
+    'Vertical 9:16 premium cinematic anime key art, no text, no captions, no watermark.',
+    `Story title: ${matchState.seedTitle}.`,
+    `Premise: ${matchState.seedTopic}.`,
+    `Story world and characters: ${matchState.seedContent}`,
+    'One emotionally charged moment, expressive faces, coherent anatomy, dramatic movie lighting, detailed environment, polished composition.',
+  ].join(' ')
+
   return (
     <section className="rounded-sm border border-rule bg-card p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -326,8 +334,22 @@ function StorySeedReelPreview({ matchState }: { matchState: MatchState }) {
         </span>
       </div>
 
-      <div className="grid gap-4">
-        <div className="rounded-sm border border-rule bg-secondary p-5">
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(280px,420px)_1fr]">
+        <div className="mx-auto w-full max-w-[420px]">
+          <AnimeReelFrame
+            eyebrow="Original cinematic seed"
+            title={matchState.seedTitle || 'Creator story seed'}
+            caption={shortReelText(matchState.seedTopic || matchState.experienceSummary)}
+            footer="Unlock the seed, then steer a new connected scene series."
+            imagePrompt={seedImagePrompt}
+            sceneIndex={1}
+            sceneTotal={1}
+            tone="romance"
+          />
+        </div>
+
+        <div className="grid gap-4">
+          <div className="rounded-sm border border-rule bg-secondary p-5">
           <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
             Story seed
           </p>
@@ -335,34 +357,38 @@ function StorySeedReelPreview({ matchState }: { matchState: MatchState }) {
             {matchState.seedTitle}
           </h3>
           <p className="mt-2 text-sm leading-6 text-ink-muted">{matchState.seedTopic}</p>
-          <div className="mt-5 max-h-[440px] overflow-y-auto whitespace-pre-wrap rounded-sm border border-rule bg-card p-5 text-sm leading-7 text-ink">
-            {matchState.seedContent}
-          </div>
-        </div>
-
-        <div className="rounded-sm border border-rule bg-secondary p-5">
-          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
-            What a paid steer generates
-          </p>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {[
-              'Story title and overview',
-              'Main character bible',
-              'Chapter structure',
-              'Scene narration',
-              'Visual descriptions',
-              'Image generation prompts',
-            ].map((item, index) => (
-              <div
-                key={item}
-                className="rounded-sm border border-rule bg-card px-4 py-3 text-sm font-semibold leading-6 text-ink"
-              >
-                <span className="mr-2 font-mono text-[10px] uppercase tracking-widest text-accent">
-                  {String(index + 1).padStart(2, '0')}
-                </span>
-                {item}
+            <details className="mt-5 rounded-sm border border-rule bg-card">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-ink">
+                Read the complete creator seed
+              </summary>
+              <div className="max-h-[360px] overflow-y-auto whitespace-pre-wrap border-t border-rule p-4 text-sm leading-7 text-ink-muted">
+                {matchState.seedContent}
               </div>
-            ))}
+            </details>
+          </div>
+
+          <div className="rounded-sm border border-rule bg-secondary p-5">
+            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
+              What a paid steer generates
+            </p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              {[
+                'Connected vertical scenes',
+                'Consistent characters',
+                'On-screen narration',
+                'Cinematic image prompts',
+              ].map((item, index) => (
+                <div
+                  key={item}
+                  className="rounded-sm border border-rule bg-card px-4 py-3 text-sm font-semibold leading-6 text-ink"
+                >
+                  <span className="mr-2 font-mono text-[10px] uppercase tracking-widest text-accent">
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+                  {item}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -501,12 +527,23 @@ function BranchList({
               tx: {branch.settlementId}
             </p>
           )}
-          {roomKind === 'story-video' && branch.scenes?.length ? (
+          {roomKind === 'story-video' ? (
             <StoryboardVideoPlayer branch={branch} />
           ) : null}
-          <div className="mt-4 whitespace-pre-wrap rounded-sm border border-rule bg-secondary p-4 text-sm leading-7 text-ink-muted">
-            {branch.body}
-          </div>
+          {roomKind === 'story-video' ? (
+            <details className="mt-4 rounded-sm border border-rule bg-secondary">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-ink">
+                Production notes and character bible
+              </summary>
+              <div className="border-t border-rule p-4 whitespace-pre-wrap text-sm leading-7 text-ink-muted">
+                {branch.body}
+              </div>
+            </details>
+          ) : (
+            <div className="mt-4 whitespace-pre-wrap rounded-sm border border-rule bg-secondary p-4 text-sm leading-7 text-ink-muted">
+              {branch.body}
+            </div>
+          )}
         </article>
       ))}
     </section>
@@ -514,7 +551,7 @@ function BranchList({
 }
 
 function StoryboardVideoPlayer({ branch }: { branch: MediaBranch }) {
-  const scenes = branch.scenes ?? []
+  const scenes = storyScenesForBranch(branch)
   const [active, setActive] = useState(0)
   const activeScene = scenes[active] ?? scenes[0]
 
@@ -544,10 +581,13 @@ function StoryboardVideoPlayer({ branch }: { branch: MediaBranch }) {
       <div className="grid gap-5 lg:grid-cols-[minmax(260px,390px)_1fr]">
         <div className="mx-auto w-full max-w-[390px]">
           <AnimeReelFrame
+            key={`${branch.id}-${active}`}
             eyebrow={activeScene.chapterTitle || 'Generated episode'}
             title={activeScene.title}
             caption={shortReelText(sceneNarration(activeScene))}
             footer={sceneVisual(activeScene)}
+            imagePrompt={sceneImagePrompt(activeScene)}
+            imageUrl={activeScene.imageUrl}
             sceneIndex={active + 1}
             sceneTotal={scenes.length}
             tone={active % 2 === 0 ? 'romance' : 'shadow'}
@@ -613,6 +653,8 @@ function AnimeReelFrame({
   caption,
   eyebrow,
   footer,
+  imagePrompt,
+  imageUrl,
   sceneIndex,
   sceneTotal,
   title,
@@ -621,12 +663,20 @@ function AnimeReelFrame({
   caption: string
   eyebrow: string
   footer: string
+  imagePrompt: string
+  imageUrl?: string
   sceneIndex: number
   sceneTotal: number
   title: string
   tone: 'romance' | 'shadow'
 }) {
   const isShadow = tone === 'shadow'
+  const [imageFailed, setImageFailed] = useState(false)
+  const renderedImageUrl =
+    imageUrl ||
+    (imagePrompt
+      ? `/api/story/image?prompt=${encodeURIComponent(imagePrompt)}&seed=${sceneIndex}`
+      : '')
   return (
     <div className="relative aspect-[9/16] overflow-hidden rounded-[28px] border border-white/15 bg-zinc-950 shadow-2xl">
       <div
@@ -636,6 +686,15 @@ function AnimeReelFrame({
             : 'bg-[radial-gradient(circle_at_80%_10%,rgba(255,255,255,0.52),transparent_17%),radial-gradient(circle_at_28%_32%,rgba(244,114,182,0.45),transparent_27%),linear-gradient(155deg,#f8d7e5_0%,#b8c7f4_48%,#332846_100%)]'
         }`}
       />
+      {renderedImageUrl && !imageFailed ? (
+        <img
+          src={renderedImageUrl}
+          alt=""
+          loading="lazy"
+          onError={() => setImageFailed(true)}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : null}
       <div className="absolute inset-0 opacity-50 [background-image:radial-gradient(circle_at_50%_22%,rgba(255,255,255,0.42)_0_1px,transparent_2px),linear-gradient(120deg,transparent_0_42%,rgba(255,255,255,0.18)_43%,transparent_46%)] [background-size:34px_34px,100%_100%]" />
       <div className="absolute -left-10 top-10 h-72 w-48 rotate-12 rounded-[48%] bg-white/24 blur-sm" />
       <div className="absolute right-6 top-20 h-48 w-28 rounded-full bg-black/30 blur-md" />
@@ -697,6 +756,79 @@ function sceneVisual(scene: MediaBranchScene) {
 
 function sceneImagePrompt(scene: MediaBranchScene) {
   return scene.imagePrompt || ''
+}
+
+function storyScenesForBranch(branch: MediaBranch): MediaBranchScene[] {
+  if (branch.scenes?.length) return branch.scenes
+
+  const chapters = Array.from(
+    branch.body.matchAll(
+      /^Chapter\s+(\d+)\s*[-\u2013\u2014]\s*([^:\n]+):\s*(.+)$/gim,
+    ),
+  )
+  const characterBible =
+    branch.body.match(/MAIN CHARACTERS:\s*([\s\S]*?)(?:\n\s*STORY STRUCTURE:|$)/i)?.[1]?.trim() ||
+    'Keep the same lead characters, facial features, hair, clothing, and proportions in every scene.'
+
+  const beats = chapters.length
+    ? chapters.flatMap((chapter) => {
+        const chapterNumber = Number(chapter[1])
+        const chapterTitle = chapter[2].trim()
+        const detail = chapter[3].trim()
+        const [action, emotion = 'The emotional stakes deepen.'] = detail.split(
+          /\s*Emotional purpose:\s*/i,
+        )
+        return [
+          {
+            sceneNumber: (chapterNumber - 1) * 2 + 1,
+            chapterTitle: `Chapter ${chapterNumber} - ${chapterTitle}`,
+            title: `${chapterTitle}: opening image`,
+            narration: action,
+            visualDescription: `${action} Establish the place and relationship in one expressive cinematic frame.`,
+            emotion,
+          },
+          {
+            sceneNumber: (chapterNumber - 1) * 2 + 2,
+            chapterTitle: `Chapter ${chapterNumber} - ${chapterTitle}`,
+            title: `${chapterTitle}: turning point`,
+            narration: `${emotion} One choice carries the story into the next chapter.`,
+            visualDescription: `${emotion} Use an intimate emotional close-up and a visibly changed relationship.`,
+            emotion,
+          },
+        ]
+      })
+    : Array.from({ length: 6 }, (_, index) => ({
+        sceneNumber: index + 1,
+        chapterTitle: `Chapter ${Math.floor(index / 2) + 1}`,
+        title: index === 5 ? 'The final choice' : `Cinematic beat ${index + 1}`,
+        narration:
+          index === 0
+            ? branch.summary
+            : `${branch.summary} The next image reveals a new emotional turn.`,
+        visualDescription: `A connected cinematic moment from ${branch.title}, continuing directly from the previous frame.`,
+        emotion: 'Emotion, suspense, and visible narrative progress.',
+      }))
+
+  return beats.slice(0, 6).map((beat) => {
+    const prompt = [
+      'Vertical 9:16 high-budget cinematic anime story frame, no words, no captions, no watermark.',
+      `Story: ${branch.title}.`,
+      `Character consistency bible: ${characterBible}`,
+      `Scene: ${beat.visualDescription}`,
+      `Mood: ${beat.emotion}`,
+      'Natural expressive faces, coherent anatomy, dramatic lighting, premium movie composition, detailed environment.',
+    ].join(' ')
+    return {
+      sceneNumber: beat.sceneNumber,
+      chapterTitle: beat.chapterTitle,
+      title: beat.title,
+      caption: beat.narration,
+      narration: beat.narration,
+      visual: beat.visualDescription,
+      visualDescription: beat.visualDescription,
+      imagePrompt: prompt,
+    }
+  })
 }
 
 function shortReelText(text: string) {

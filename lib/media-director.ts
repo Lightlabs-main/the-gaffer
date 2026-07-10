@@ -16,7 +16,7 @@ export async function generateMediaBranch(opts: {
   const kind = branchKind(opts.matchState.roomKind)
   const response = await client.messages.create({
     model,
-    max_tokens: kind === 'storyboard-video' ? 3600 : 1800,
+    max_tokens: kind === 'storyboard-video' ? 4800 : 1800,
     system: buildSystemPrompt(opts.matchState.roomKind),
     messages: [
       {
@@ -41,7 +41,10 @@ export async function generateMediaBranch(opts: {
     title: parsed.title,
     summary: parsed.summary,
     body: parsed.body,
-    scenes: kind === 'storyboard-video' ? parsed.scenes : undefined,
+    scenes:
+      kind === 'storyboard-video'
+        ? ensureStoryboardScenes(parsed.scenes, parsed.body, parsed.title, parsed.summary)
+        : undefined,
     amountUsdc: opts.amountUsdc,
     settlementId: opts.settlementId,
     createdAt: Date.now(),
@@ -71,7 +74,7 @@ For story video, you are an award-winning filmmaker, novelist, storyboard artist
 Your job is to create a complete cinematic image-story series that feels like a movie told through pictures.
 Do not create random images. Build a connected emotional story where every image continues from the previous one.
 
-The creator seed and paid steer are the user's idea. If genre, visual style, or chapter count are not explicit, infer them from the seed and steer. Default to 3 chapters and 8 image scenes total.
+The creator seed and paid steer are the user's idea. If genre, visual style, or chapter count are not explicit, infer them from the seed and steer. Default to 3 chapters and exactly 6 image scenes total.
 
 Return valid compact JSON only:
 {
@@ -96,7 +99,9 @@ Rules:
 - Every image must reveal emotion, conflict, mystery, or progress.
 - Avoid boring scenes and random changes.
 - Make it feel like a premium cinematic visual story series.
-- Keep body concise enough for a web UI, but make scenes detailed and directly usable for image generation.`
+- Keep body under 700 words.
+- Return exactly 6 scenes. Do not return an empty scenes array.
+- Make every imagePrompt self-contained and directly usable by an image model.`
   }
   return `${base} For article/story, write a strong alternate branch or angle. Body should be 350-500 words. scenes should be an empty array. Keep the JSON compact.`
 }
@@ -168,6 +173,82 @@ function parseBranchJson(text: string): {
       scenes: [],
     }
   }
+}
+
+function ensureStoryboardScenes(
+  scenes: NonNullable<MediaBranch['scenes']>,
+  body: string,
+  title: string,
+  summary: string,
+): NonNullable<MediaBranch['scenes']> {
+  if (scenes.length) return scenes
+
+  const chapters = Array.from(
+    body.matchAll(
+      /^Chapter\s+(\d+)\s*[-\u2013\u2014]\s*([^:\n]+):\s*(.+)$/gim,
+    ),
+  )
+
+  const characterBible =
+    body.match(/MAIN CHARACTERS:\s*([\s\S]*?)(?:\n\s*STORY STRUCTURE:|$)/i)?.[1]?.trim() ||
+    'Keep the lead characters visually identical in every frame.'
+
+  const beats = chapters.length
+    ? chapters.flatMap((chapter) => {
+        const chapterNumber = Number(chapter[1])
+        const chapterTitle = chapter[2].trim()
+        const detail = chapter[3].trim()
+        const [action, emotion = 'The emotional stakes deepen.'] = detail.split(
+          /\s*Emotional purpose:\s*/i,
+        )
+        return [
+          {
+            sceneNumber: (chapterNumber - 1) * 2 + 1,
+            chapterTitle: `Chapter ${chapterNumber} - ${chapterTitle}`,
+            title: `${chapterTitle}: opening image`,
+            caption: action,
+            visual: `${action} Establish the location, relationship, and visual motif with a strong cinematic composition.`,
+            emotion,
+          },
+          {
+            sceneNumber: (chapterNumber - 1) * 2 + 2,
+            chapterTitle: `Chapter ${chapterNumber} - ${chapterTitle}`,
+            title: `${chapterTitle}: turning point`,
+            caption: `${emotion} The characters make a choice that carries the story into the next scene.`,
+            visual: `${emotion} Show a decisive emotional close-up and a clear change in the relationship.`,
+            emotion,
+          },
+        ]
+      })
+    : Array.from({ length: 6 }, (_, index) => ({
+        sceneNumber: index + 1,
+        chapterTitle: `Chapter ${Math.floor(index / 2) + 1}`,
+        title: index === 5 ? 'The final choice' : `Story beat ${index + 1}`,
+        caption: index === 0 ? summary : `${summary} The story advances toward its next emotional turn.`,
+        visual: `A connected cinematic frame from ${title}, continuing directly from the previous moment.`,
+        emotion: 'Emotion, conflict, mystery, and visible narrative progress.',
+      }))
+
+  return beats.slice(0, 6).map((beat) => {
+    const visualDescription = beat.visual
+    return {
+      sceneNumber: beat.sceneNumber,
+      chapterTitle: beat.chapterTitle,
+      title: beat.title,
+      caption: beat.caption,
+      narration: beat.caption,
+      visual: visualDescription,
+      visualDescription,
+      imagePrompt: [
+        'Vertical 9:16 high-budget cinematic story frame, no text, no captions, no watermark.',
+        `Story: ${title}.`,
+        `Character consistency bible: ${characterBible}`,
+        `Scene: ${visualDescription}`,
+        `Mood: ${beat.emotion}`,
+        'Natural expressive faces, coherent anatomy, dramatic cinematic lighting, professional composition, detailed environment.',
+      ].join(' '),
+    }
+  })
 }
 
 function extractJsonStringField(text: string, field: string): string | null {

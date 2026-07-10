@@ -122,6 +122,7 @@ export interface MediaBranchScene {
   narration?: string
   visualDescription?: string
   imagePrompt?: string
+  imageUrl?: string
 }
 
 export interface MediaBranch {
