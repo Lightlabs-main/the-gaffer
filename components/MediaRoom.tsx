@@ -317,62 +317,52 @@ function StorySeedReelPreview({ matchState }: { matchState: MatchState }) {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
-            Original story reel
+            Original creator seed
           </p>
-          <h2 className="mt-1 text-2xl font-semibold text-ink">Creator seed preview</h2>
+          <h2 className="mt-1 text-2xl font-semibold text-ink">Story package preview</h2>
         </div>
         <span className="rounded-full border border-rule px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-ink-muted">
           Unlocked
         </span>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(260px,390px)_1fr]">
-        <div className="mx-auto w-full max-w-[390px]">
-          <AnimeReelFrame
-            eyebrow="Cinematic seed"
-            title={matchState.seedTitle ?? matchState.homeTeam.name}
-            caption={matchState.seedTitle ?? 'Story seed ready'}
-            footer={matchState.seedTopic ?? matchState.awayTeam.name}
-            sceneIndex={1}
-            sceneTotal={1}
-            tone="romance"
-          />
-        </div>
-        <div className="grid min-w-0 content-start gap-4">
-          <div className="rounded-sm border border-rule bg-secondary p-4">
-            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
-              Cinematic generator
-            </p>
-            <h3 className="mt-2 text-xl font-semibold text-ink">
-              The next steer becomes a full image-story series.
-            </h3>
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
-              {[
-                'Story title and overview',
-                'Main character bible',
-                'Chapter structure',
-                'Scene narration',
-                'Visual descriptions',
-                'Image generation prompts',
-              ].map((item) => (
-                <div
-                  key={item}
-                  className="rounded-sm border border-rule bg-card px-3 py-2 text-xs font-semibold text-ink"
-                >
-                  {item}
-                </div>
-              ))}
-            </div>
+      <div className="grid gap-4">
+        <div className="rounded-sm border border-rule bg-secondary p-5">
+          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
+            Story seed
+          </p>
+          <h3 className="mt-2 text-3xl font-semibold leading-tight text-ink">
+            {matchState.seedTitle}
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-ink-muted">{matchState.seedTopic}</p>
+          <div className="mt-5 max-h-[440px] overflow-y-auto whitespace-pre-wrap rounded-sm border border-rule bg-card p-5 text-sm leading-7 text-ink">
+            {matchState.seedContent}
           </div>
-          <div className="flex min-w-0 flex-col rounded-sm border border-rule bg-secondary p-4">
-            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
-              Story seed
-            </p>
-            <h3 className="mt-2 text-xl font-semibold text-ink">{matchState.seedTitle}</h3>
-            <p className="mt-2 text-sm leading-6 text-ink-muted">{matchState.seedTopic}</p>
-            <div className="mt-4 max-h-[360px] overflow-y-auto whitespace-pre-wrap rounded-sm border border-rule bg-card p-4 text-sm leading-7 text-ink">
-              {matchState.seedContent}
-            </div>
+        </div>
+
+        <div className="rounded-sm border border-rule bg-secondary p-5">
+          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
+            What a paid steer generates
+          </p>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {[
+              'Story title and overview',
+              'Main character bible',
+              'Chapter structure',
+              'Scene narration',
+              'Visual descriptions',
+              'Image generation prompts',
+            ].map((item, index) => (
+              <div
+                key={item}
+                className="rounded-sm border border-rule bg-card px-4 py-3 text-sm font-semibold leading-6 text-ink"
+              >
+                <span className="mr-2 font-mono text-[10px] uppercase tracking-widest text-accent">
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                {item}
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -713,15 +703,6 @@ function shortReelText(text: string) {
   const trimmed = text.replace(/^NARRATION:\s*/i, '').trim()
   if (trimmed.length <= 180) return trimmed
   return `${trimmed.slice(0, 177).trim()}...`
-}
-
-function reelCaptionFromText(text: string | undefined, fallback: string | undefined) {
-  const source = (text || fallback || 'A paid story seed is ready to branch.').trim()
-  const sentence = source
-    .split(/[.!?]\s+/)
-    .map((item) => item.trim())
-    .find((item) => item.length > 20)
-  return (sentence || source).slice(0, 145)
 }
 
 function StepCard({ label, title, body }: { label: string; title: string; body: string }) {
