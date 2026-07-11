@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useEffect, useMemo, useState } from 'react'
 import CircleAccountPanel from './CircleAccountPanel'
 import ProvenancePanel from './ProvenancePanel'
@@ -124,7 +125,13 @@ export default function MediaRoom({
             />
           ) : (
             <>
-              <section className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
+              <section
+                className={
+                  matchState.roomKind === 'story-video'
+                    ? 'grid items-start gap-4'
+                    : 'grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]'
+                }
+              >
                 <SeedPanel matchState={matchState} />
                 <SteerPanel
                   matchState={matchState}
@@ -327,7 +334,7 @@ function StorySeedReelPreview({ matchState }: { matchState: MatchState }) {
           <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
             Original creator seed
           </p>
-          <h2 className="mt-1 text-2xl font-semibold text-ink">Story package preview</h2>
+          <h2 className="mt-1 text-2xl font-semibold text-ink">Original cinematic story</h2>
         </div>
         <span className="rounded-full border border-rule px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-ink-muted">
           Unlocked
@@ -342,6 +349,7 @@ function StorySeedReelPreview({ matchState }: { matchState: MatchState }) {
             caption={shortReelText(matchState.seedTopic || matchState.experienceSummary)}
             footer="Unlock the seed, then steer a new connected scene series."
             imagePrompt={seedImagePrompt}
+            imageSeed={imageSeedFromText(matchState.id)}
             sceneIndex={1}
             sceneTotal={1}
             tone="romance"
@@ -553,15 +561,22 @@ function BranchList({
 function StoryboardVideoPlayer({ branch }: { branch: MediaBranch }) {
   const scenes = storyScenesForBranch(branch)
   const [active, setActive] = useState(0)
+  const [sceneReady, setSceneReady] = useState(false)
   const activeScene = scenes[active] ?? scenes[0]
 
   useEffect(() => {
-    if (scenes.length < 2) return
+    if (scenes.length < 2 || !sceneReady) return
     const timer = window.setInterval(() => {
+      setSceneReady(false)
       setActive((current) => (current + 1) % scenes.length)
-    }, 2800)
+    }, 6500)
     return () => window.clearInterval(timer)
-  }, [scenes.length])
+  }, [sceneReady, scenes.length])
+
+  const showScene = (index: number) => {
+    setSceneReady(false)
+    setActive(index)
+  }
 
   if (!activeScene) return null
 
@@ -588,10 +603,28 @@ function StoryboardVideoPlayer({ branch }: { branch: MediaBranch }) {
             footer={sceneVisual(activeScene)}
             imagePrompt={sceneImagePrompt(activeScene)}
             imageUrl={activeScene.imageUrl}
+            imageSeed={imageSeedFromText(branch.id)}
+            onImageReady={() => setSceneReady(true)}
             sceneIndex={active + 1}
             sceneTotal={scenes.length}
             tone={active % 2 === 0 ? 'romance' : 'shadow'}
           />
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => showScene((active - 1 + scenes.length) % scenes.length)}
+              className="rounded-sm border border-rule bg-secondary px-4 py-3 text-sm font-semibold text-ink hover:bg-card"
+            >
+              Previous scene
+            </button>
+            <button
+              type="button"
+              onClick={() => showScene((active + 1) % scenes.length)}
+              className="rounded-sm bg-ink px-4 py-3 text-sm font-semibold text-paper"
+            >
+              Next scene
+            </button>
+          </div>
         </div>
         <div className="grid content-start gap-3">
           <div className="rounded-sm border border-white/10 bg-white/5 p-4">
@@ -626,7 +659,7 @@ function StoryboardVideoPlayer({ branch }: { branch: MediaBranch }) {
               <button
                 key={`${branch.id}-scene-${index}`}
                 type="button"
-                onClick={() => setActive(index)}
+                onClick={() => showScene(index)}
                 className={`rounded-sm border p-3 text-left transition ${
                   index === active
                     ? 'border-accent bg-white text-black'
@@ -654,7 +687,9 @@ function AnimeReelFrame({
   eyebrow,
   footer,
   imagePrompt,
+  imageSeed,
   imageUrl,
+  onImageReady,
   sceneIndex,
   sceneTotal,
   title,
@@ -664,7 +699,9 @@ function AnimeReelFrame({
   eyebrow: string
   footer: string
   imagePrompt: string
+  imageSeed?: number
   imageUrl?: string
+  onImageReady?: () => void
   sceneIndex: number
   sceneTotal: number
   title: string
@@ -672,10 +709,12 @@ function AnimeReelFrame({
 }) {
   const isShadow = tone === 'shadow'
   const [imageFailed, setImageFailed] = useState(false)
+  const [imageLoaded, setImageLoaded] = useState(false)
+  const [retryNonce, setRetryNonce] = useState(0)
   const renderedImageUrl =
     imageUrl ||
     (imagePrompt
-      ? `/api/story/image?prompt=${encodeURIComponent(imagePrompt.slice(0, 1800))}&seed=${sceneIndex}`
+      ? `/api/story/image?prompt=${encodeURIComponent(imagePrompt.slice(0, 1800))}&seed=${imageSeed ?? sceneIndex}&retry=${retryNonce}`
       : '')
   return (
     <div className="relative aspect-[9/16] overflow-hidden rounded-[28px] border border-white/15 bg-zinc-950 shadow-2xl">
@@ -687,18 +726,61 @@ function AnimeReelFrame({
         }`}
       />
       {renderedImageUrl && !imageFailed ? (
-        <img
+        <Image
           src={renderedImageUrl}
           alt=""
-          loading="lazy"
-          onError={() => setImageFailed(true)}
-          className="absolute inset-0 h-full w-full object-cover"
+          fill
+          priority
+          unoptimized
+          sizes="(max-width: 640px) 100vw, 420px"
+          onLoad={() => {
+            setImageLoaded(true)
+            onImageReady?.()
+          }}
+          onError={() => {
+            setImageLoaded(false)
+            setImageFailed(true)
+          }}
+          className={`object-cover transition-opacity duration-500 ${
+            imageLoaded ? 'opacity-100' : 'opacity-0'
+          }`}
         />
       ) : null}
       <div className="absolute inset-0 opacity-50 [background-image:radial-gradient(circle_at_50%_22%,rgba(255,255,255,0.42)_0_1px,transparent_2px),linear-gradient(120deg,transparent_0_42%,rgba(255,255,255,0.18)_43%,transparent_46%)] [background-size:34px_34px,100%_100%]" />
       <div className="absolute -left-10 top-10 h-72 w-48 rotate-12 rounded-[48%] bg-white/24 blur-sm" />
       <div className="absolute right-6 top-20 h-48 w-28 rounded-full bg-black/30 blur-md" />
       <div className="absolute bottom-0 left-0 right-0 h-2/3 bg-gradient-to-t from-black via-black/55 to-transparent" />
+
+      {renderedImageUrl && !imageLoaded && !imageFailed ? (
+        <div className="absolute inset-0 z-20 grid place-items-center bg-black/45 px-8 text-center backdrop-blur-sm">
+          <div>
+            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-white/25 border-t-white" />
+            <p className="mt-4 text-sm font-semibold text-white">Rendering cinematic frame...</p>
+            <p className="mt-1 text-xs leading-5 text-white/65">
+              The first render can take a few seconds. This scene will wait for its artwork.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {imageFailed ? (
+        <div className="absolute inset-0 z-20 grid place-items-center bg-black/70 px-8 text-center backdrop-blur-sm">
+          <div>
+            <p className="text-sm font-semibold text-white">Artwork did not finish rendering.</p>
+            <button
+              type="button"
+              onClick={() => {
+                setImageFailed(false)
+                setImageLoaded(false)
+                setRetryNonce((current) => current + 1)
+              }}
+              className="mt-4 rounded-sm bg-white px-4 py-2 text-sm font-semibold text-black"
+            >
+              Retry artwork
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="absolute left-4 right-4 top-4 flex items-center justify-between">
         <span className="rounded-full bg-black/40 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-white backdrop-blur">
@@ -835,6 +917,15 @@ function shortReelText(text: string) {
   const trimmed = text.replace(/^NARRATION:\s*/i, '').trim()
   if (trimmed.length <= 180) return trimmed
   return `${trimmed.slice(0, 177).trim()}...`
+}
+
+function imageSeedFromText(value: string) {
+  let hash = 2166136261
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return Math.abs(hash >>> 0)
 }
 
 function StepCard({ label, title, body }: { label: string; title: string; body: string }) {
