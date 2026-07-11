@@ -319,13 +319,13 @@ function SeedPanel({ matchState }: { matchState: MatchState }) {
 }
 
 function StorySeedReelPreview({ matchState }: { matchState: MatchState }) {
-  const seedImagePrompt = [
-    'Vertical 9:16 premium cinematic anime key art, no text, no captions, no watermark.',
-    `Story title: ${matchState.seedTitle}.`,
-    `Premise: ${matchState.seedTopic}.`,
-    `Story world and characters: ${matchState.seedContent}`,
-    'One emotionally charged moment, expressive faces, coherent anatomy, dramatic movie lighting, detailed environment, polished composition.',
-  ].join(' ')
+  const scenes = storySeedScenes(matchState)
+  const [active, setActive] = useState(0)
+  const activeScene = scenes[active] ?? scenes[0]
+
+  const showScene = (index: number) => {
+    setActive(Math.min(Math.max(index, 0), scenes.length - 1))
+  }
 
   return (
     <section className="rounded-sm border border-rule bg-card p-5">
@@ -342,18 +342,55 @@ function StorySeedReelPreview({ matchState }: { matchState: MatchState }) {
       </div>
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(280px,420px)_1fr]">
-        <div className="mx-auto w-full max-w-[420px]">
+        <div
+          className="mx-auto w-full max-w-[420px]"
+          tabIndex={0}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowLeft') showScene(active - 1)
+            if (event.key === 'ArrowRight') showScene(active + 1)
+          }}
+        >
           <AnimeReelFrame
-            eyebrow="Original cinematic seed"
-            title={matchState.seedTitle || 'Creator story seed'}
-            caption={shortReelText(matchState.seedTopic || matchState.experienceSummary)}
-            footer="Unlock the seed, then steer a new connected scene series."
-            imagePrompt={seedImagePrompt}
-            imageSeed={imageSeedFromText(matchState.id)}
-            sceneIndex={1}
-            sceneTotal={1}
-            tone="romance"
+            key={`${matchState.id}-seed-${active}`}
+            eyebrow={activeScene.chapterTitle || 'Original cinematic seed'}
+            title={activeScene.title}
+            caption={shortReelText(sceneNarration(activeScene))}
+            footer={sceneVisual(activeScene)}
+            imagePrompt={sceneImagePrompt(activeScene)}
+            imageSeed={imageSeedFromText(`${matchState.id}-${active}`)}
+            sceneIndex={active + 1}
+            sceneTotal={scenes.length}
+            tone={active % 2 === 0 ? 'romance' : 'shadow'}
           />
+
+          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-secondary">
+            <div
+              className="h-full bg-accent transition-[width] duration-300"
+              style={{ width: `${((active + 1) / scenes.length) * 100}%` }}
+            />
+          </div>
+
+          <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+            <button
+              type="button"
+              onClick={() => showScene(active - 1)}
+              disabled={active === 0}
+              className="rounded-sm border border-rule bg-secondary px-3 py-3 text-sm font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              Previous scene
+            </button>
+            <span className="min-w-14 text-center font-mono text-xs text-ink-muted">
+              {active + 1}/{scenes.length}
+            </span>
+            <button
+              type="button"
+              onClick={() => showScene(active + 1)}
+              disabled={active === scenes.length - 1}
+              className="rounded-sm bg-ink px-3 py-3 text-sm font-semibold text-paper disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              Next scene
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-4">
@@ -373,6 +410,38 @@ function StorySeedReelPreview({ matchState }: { matchState: MatchState }) {
                 {matchState.seedContent}
               </div>
             </details>
+          </div>
+
+          <div className="rounded-sm border border-rule bg-secondary p-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
+                Scene navigator
+              </p>
+              <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">
+                Select a scene
+              </span>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {scenes.map((scene, index) => (
+                <button
+                  key={`${matchState.id}-seed-scene-${index}`}
+                  type="button"
+                  onClick={() => showScene(index)}
+                  className={`rounded-sm border p-3 text-left transition ${
+                    index === active
+                      ? 'border-accent bg-ink text-paper'
+                      : 'border-rule bg-card text-ink hover:border-ink-muted'
+                  }`}
+                >
+                  <span className="font-mono text-[10px] uppercase tracking-widest opacity-70">
+                    Scene {index + 1}
+                  </span>
+                  <span className="mt-1 block text-sm font-semibold leading-5">
+                    {scene.title}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="rounded-sm border border-rule bg-secondary p-5">
@@ -402,6 +471,54 @@ function StorySeedReelPreview({ matchState }: { matchState: MatchState }) {
       </div>
     </section>
   )
+}
+
+function storySeedScenes(matchState: MatchState): MediaBranchScene[] {
+  const cleanParagraphs = (matchState.seedContent || matchState.experienceSummary)
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+
+  const fallbackBeats = [
+    matchState.seedTopic || matchState.experienceSummary,
+    `The central characters enter the world of ${matchState.seedTitle}.`,
+    'A hidden truth changes the meaning of their relationship.',
+    'The final choice carries them into the audience-steered continuation.',
+  ]
+  const beats = Array.from({ length: 4 }, (_, index) =>
+    cleanParagraphs[index] || fallbackBeats[index],
+  )
+
+  const sceneTitles = ['The world opens', 'Paths cross', 'The secret surfaces', 'The choice']
+  const cameraDirection = [
+    'Wide establishing shot that introduces the world and its visual motif.',
+    'Intimate medium shot showing the lead characters meeting with restrained emotion.',
+    'Dramatic close-up as a hidden truth becomes visible in their expressions.',
+    'Cinematic final composition at the decisive location, charged with unresolved emotion.',
+  ]
+  const characterBible = [
+    `Story title: ${matchState.seedTitle}.`,
+    `Premise: ${matchState.seedTopic}.`,
+    `Character and world reference: ${matchState.seedContent}`,
+    'Keep every recurring character visually identical across all four scenes: same facial features, hair, body proportions, signature clothing, and age.',
+  ].join(' ')
+
+  return beats.map((beat, index) => ({
+    sceneNumber: index + 1,
+    chapterTitle: index < 2 ? 'Episode 1 - The meeting' : 'Episode 1 - The choice',
+    title: sceneTitles[index],
+    caption: beat,
+    narration: beat,
+    visual: cameraDirection[index],
+    visualDescription: cameraDirection[index],
+    imagePrompt: [
+      'Vertical 9:16 premium cinematic anime film frame, no text, no captions, no watermark.',
+      characterBible,
+      `Scene ${index + 1} of 4: ${beat}`,
+      cameraDirection[index],
+      'Connected visual continuity from the previous scene, expressive natural faces, coherent anatomy, dramatic movie lighting, richly detailed environment, polished high-budget composition.',
+    ].join(' '),
+  }))
 }
 
 function SteerPanel({
