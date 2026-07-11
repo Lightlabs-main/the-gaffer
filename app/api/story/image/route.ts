@@ -60,19 +60,13 @@ export async function GET(request: NextRequest) {
       return imageResponse(falImage.image, 'fal-cacheable', falImage.contentType)
     } catch (error) {
       console.warn('[story-image] fal render failed; trying fallback provider', error)
-      if (!apiKey && process.env.NODE_ENV === 'production') {
-        return NextResponse.json(
-          { error: 'Image renderer failed. Check FAL_KEY or add a fallback provider.' },
-          { status: 502 },
-        )
-      }
     }
   }
 
   const endpoint = apiKey
     ? 'https://gen.pollinations.ai/image/'
     : 'https://image.pollinations.ai/prompt/'
-  const url = new URL(`${endpoint}${encodeURIComponent(safePrompt)}`)
+  const url = new URL(`${endpoint}${encodeURIComponent(cinematicPrompt)}`)
   url.searchParams.set('model', model)
   url.searchParams.set('width', '768')
   url.searchParams.set('height', '1365')
