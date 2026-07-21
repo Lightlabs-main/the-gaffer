@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { useEffect, useMemo, useState } from 'react'
 import CircleAccountPanel from './CircleAccountPanel'
 import ProvenancePanel from './ProvenancePanel'
+import { publicErrorMessage } from '@/lib/public-error'
 import type { MatchState, MediaBranch, MediaBranchScene, ProvenanceEvent } from '@/lib/types'
 
 interface Props {
@@ -51,7 +52,7 @@ export default function MediaRoom({
       if (!res.ok) throw new Error(data.message || data.error || 'Unlock failed')
       onMatchState(data.matchState)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Unlock failed')
+      setError(publicErrorMessage(err, 'Unlock failed. Please try again.'))
     } finally {
       setBusy(null)
     }
@@ -76,7 +77,7 @@ export default function MediaRoom({
       setPrompt('')
       onMatchState(data.matchState)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Branch failed')
+      setError(publicErrorMessage(err, 'The branch could not be generated. Please try again.'))
     } finally {
       setBusy(null)
     }
@@ -85,9 +86,9 @@ export default function MediaRoom({
   const branchCount = matchState.branches?.length ?? 0
 
   return (
-    <main className="min-h-screen bg-paper px-4 py-4 text-ink">
-      <div className="mx-auto grid w-full max-w-7xl gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <section className="flex flex-col gap-4">
+    <main className="min-h-screen min-w-0 overflow-x-hidden bg-paper px-3 py-3 text-ink sm:px-4 sm:py-4">
+      <div className="mx-auto grid min-w-0 w-full max-w-7xl gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <section className="flex min-w-0 flex-col gap-4">
           <header className="overflow-hidden rounded-sm border border-rule bg-card p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
@@ -146,13 +147,13 @@ export default function MediaRoom({
           )}
 
           {error && (
-            <div className="rounded-sm border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600">
+            <div className="max-w-full overflow-hidden break-words rounded-sm border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600">
               {error}
             </div>
           )}
         </section>
 
-        <aside className="flex flex-col gap-4">
+        <aside className="flex min-w-0 flex-col gap-4">
           {walletStatus !== 'ready' || !walletAddress ? <CircleAccountPanel /> : null}
           <RoomAccessPanel
             address={walletAddress}
@@ -328,7 +329,7 @@ function StorySeedReelPreview({ matchState }: { matchState: MatchState }) {
   }
 
   return (
-    <section className="rounded-sm border border-rule bg-card p-5">
+    <section className="min-w-0 overflow-hidden rounded-sm border border-rule bg-card p-4 sm:p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
@@ -1091,7 +1092,7 @@ function RoomAccessPanel({
   }
 
   return (
-    <section className="rounded-sm border border-rule bg-card p-5">
+    <section className="min-w-0 overflow-hidden rounded-sm border border-rule bg-card p-4 sm:p-5">
       <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-accent">
         Reader access
       </p>
@@ -1120,16 +1121,16 @@ function RoomAccessPanel({
             </button>
           )}
         </div>
-        <input
-          readOnly
-          value={address ?? 'Preparing'}
-          className="mt-2 w-full border-0 bg-transparent p-0 font-mono text-xs text-ink outline-none"
+        <p
+          className="mt-2 max-w-full break-all font-mono text-xs leading-5 text-ink"
           aria-label="Circle reader wallet address"
-        />
+        >
+          {address ?? 'Preparing'}
+        </p>
       </div>
       {error && (
-        <div className="mt-3 rounded-sm border border-red-500/30 bg-red-500/10 p-3 text-xs leading-5 text-red-600">
-          {error}
+        <div className="mt-3 max-w-full overflow-hidden break-words rounded-sm border border-red-500/30 bg-red-500/10 p-3 text-xs leading-5 text-red-600">
+          {publicErrorMessage(error, 'Wallet setup needs attention. Please try again.')}
         </div>
       )}
     </section>

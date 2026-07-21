@@ -9,6 +9,7 @@ import {
   shortAddress,
   type ProfileIdentity,
 } from '@/lib/client-profile'
+import { publicErrorMessage } from '@/lib/public-error'
 
 export default function CircleAccountPanel({
   initialIdentity = null,
@@ -94,7 +95,7 @@ export default function CircleAccountPanel({
       setIdentity(nextIdentity)
       window.dispatchEvent(new Event('gaffer-auth-changed'))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Wallet login failed')
+      setError(publicErrorMessage(err, 'Wallet login failed. Please try again.'))
     } finally {
       setBusy(false)
     }
@@ -184,7 +185,7 @@ export default function CircleAccountPanel({
   }
 
   return (
-    <section className="rounded-sm border border-rule bg-card p-4">
+    <section className="min-w-0 overflow-hidden rounded-sm border border-rule bg-card p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-ink">
           Account
@@ -235,8 +236,8 @@ export default function CircleAccountPanel({
               {balanceBusy ? 'Refreshing balance...' : 'Refresh balance'}
             </button>
             {balanceError && (
-              <div className="mt-2 rounded-sm border border-red-500/30 bg-red-500/10 p-2 text-xs leading-5 text-red-600">
-                {balanceError}
+              <div className="mt-2 max-w-full overflow-hidden break-words rounded-sm border border-red-500/30 bg-red-500/10 p-2 text-xs leading-5 text-red-600">
+                {publicErrorMessage(balanceError, 'Balance refresh failed. Please try again.')}
               </div>
             )}
           </div>
@@ -308,8 +309,8 @@ export default function CircleAccountPanel({
                 </div>
               )}
               {sendError && (
-                <div className="mt-3 rounded-sm border border-red-500/30 bg-red-500/10 p-3 text-xs leading-5 text-red-600">
-                  {sendError}
+                <div className="mt-3 max-w-full overflow-hidden break-words rounded-sm border border-red-500/30 bg-red-500/10 p-3 text-xs leading-5 text-red-600">
+                  {publicErrorMessage(sendError, 'The transfer could not be sent. Please try again.')}
                 </div>
               )}
             </div>
@@ -317,7 +318,7 @@ export default function CircleAccountPanel({
 
           {identity.fundingWarning && (
             <div className="mt-3 rounded-sm border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-5 text-amber-700">
-              {identity.fundingWarning}
+              {publicErrorMessage(identity.fundingWarning, 'Wallet funding needs attention.')}
             </div>
           )}
           {copyStatus === 'failed' && (
@@ -359,8 +360,8 @@ export default function CircleAccountPanel({
             </button>
           </div>
           {error && (
-            <div className="mt-3 rounded-sm border border-red-500/30 bg-red-500/10 p-3 text-xs leading-5 text-red-600">
-              {error}
+            <div className="mt-3 max-w-full overflow-hidden break-words rounded-sm border border-red-500/30 bg-red-500/10 p-3 text-xs leading-5 text-red-600">
+              {publicErrorMessage(error, 'Wallet login failed. Please try again.')}
             </div>
           )}
         </div>

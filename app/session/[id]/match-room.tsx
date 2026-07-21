@@ -15,6 +15,7 @@ import MatchStatusPanel from '@/components/MatchStatusPanel'
 import ProvenancePanel from '@/components/ProvenancePanel'
 import AIScoutPanel from '@/components/AIScoutPanel'
 import MediaRoom from '@/components/MediaRoom'
+import { publicErrorMessage } from '@/lib/public-error'
 import {
   hasCircleProfileIdentity,
   readProfileIdentity,
@@ -153,7 +154,7 @@ export default function MatchRoom({ sessionId, initialSession = null }: Props) {
         })
       } catch (err: unknown) {
         if (cancelled) return
-        const message = err instanceof Error ? err.message : 'Wallet error'
+        const message = publicErrorMessage(err, 'Wallet setup needs attention. Please try again.')
         setWalletError(message)
         setWalletStatus('error')
       }
@@ -193,7 +194,7 @@ export default function MatchRoom({ sessionId, initialSession = null }: Props) {
         setWalletError('Fund this wallet with Arc Testnet USDC before preparing Gateway.')
       }
     } catch (err: unknown) {
-      setWalletError(err instanceof Error ? err.message : 'Gateway preparation failed')
+      setWalletError(publicErrorMessage(err, 'Gateway preparation failed. Please try again.'))
     } finally {
       setPreparingGateway(false)
     }
