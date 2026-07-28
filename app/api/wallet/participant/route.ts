@@ -11,8 +11,7 @@
 import { NextResponse } from 'next/server'
 import { getAddress, type Address } from 'viem'
 import { getSession, persistSession } from '@/lib/session-store'
-import { createUserWallet } from '@/lib/circle'
-import { readUsdcBalance } from '@/lib/chain'
+import { createUserWallet, readWalletUsdcBalance } from '@/lib/circle'
 import { depositForParticipant, readGatewayAvailableBalance } from '@/lib/gateway'
 import { addParticipant, getParticipant } from '@/lib/participant-store'
 
@@ -56,8 +55,9 @@ export async function POST(req: Request): Promise<NextResponse> {
     const existingParticipant = getParticipant(session.id, wallet.walletId)
 
     stage = 'read-wallet-balance'
-    const onChainBalance = await readUsdcBalance(wallet.address)
-    let gatewayBalance = await readGatewayAvailableBalance(wallet.address)
+    const onChainBalance = await readWalletUsdcBalance(wallet)
+    let gatewayBalance = { raw: 0n, formatted: '0' }
+    let gatewayBalanceVerified = false
     let approveTransactionId = existingParticipant?.approveTransactionId
     let depositTransactionId = existingParticipant?.depositTransactionId
     let gatewayDepositedUsdc = existingParticipant?.gatewayDepositedUsdc
@@ -78,6 +78,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         depositor: wallet.address,
         atLeastAtomic: BigInt(deposit.amountAtomic),
       })
+      gatewayBalanceVerified = true
     }
 
     stage = 'store-participant'
@@ -100,9 +101,11 @@ export async function POST(req: Request): Promise<NextResponse> {
         gatewayDepositedUsdc,
         balanceOnChain: onChainBalance.formatted,
         balanceOnChainRaw: onChainBalance.raw.toString(),
+        balanceSource: onChainBalance.source,
         gatewayAvailable: gatewayBalance.formatted,
         gatewayAvailableRaw: gatewayBalance.raw.toString(),
         gatewayReady: gatewayBalance.raw > 0n,
+        gatewayBalanceVerified,
         fundingRequired: onChainBalance.raw === 0n,
         approveTransactionId,
         depositTransactionId,

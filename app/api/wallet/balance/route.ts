@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { isAddress } from 'viem'
-import { readUsdcBalance } from '@/lib/chain'
+import { readWalletUsdcBalance } from '@/lib/circle'
 import type { ProfileIdentity } from '@/lib/client-profile'
 import { upsertUserWallet } from '@/lib/user-wallet-store'
 
@@ -30,7 +30,10 @@ export async function GET(): Promise<NextResponse> {
       return NextResponse.json({ message: 'Login required' }, { status: 401 })
     }
 
-    const balance = await readUsdcBalance(identity.address as `0x${string}`)
+    const balance = await readWalletUsdcBalance({
+      walletId: identity.walletId,
+      address: identity.address as `0x${string}`,
+    })
     const fundingWarning =
       balance.raw > 0n ? undefined : identity.fundingWarning
     await upsertUserWallet({
@@ -49,6 +52,7 @@ export async function GET(): Promise<NextResponse> {
       address: identity.address,
       balance: balance.formatted,
       balanceRaw: balance.raw.toString(),
+      balanceSource: balance.source,
       fundingWarning: fundingWarning ?? null,
       asset: identity.asset ?? 'USDC (Arc Testnet)',
       chainId: identity.chainId ?? 5042002,

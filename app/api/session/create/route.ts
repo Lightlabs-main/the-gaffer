@@ -6,7 +6,7 @@
 import { NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
 import { isAddress, type Address } from 'viem'
-import { readUsdcBalance } from '@/lib/chain'
+import { readWalletUsdcBalance } from '@/lib/circle'
 import { setSession } from '@/lib/session-store'
 import type { MatchState, Session } from '@/lib/types'
 import { appendProvenance } from '@/lib/provenance'
@@ -64,7 +64,10 @@ export async function POST(req: Request): Promise<NextResponse> {
     let balance = { formatted: '0', raw: 0n }
     let fundingWarning: string | undefined
     try {
-      balance = await readUsdcBalance(address as Address)
+      balance = await readWalletUsdcBalance({
+        walletId,
+        address: address as Address,
+      })
     } catch (balanceErr: unknown) {
       const message =
         balanceErr instanceof Error ? balanceErr.message : String(balanceErr)

@@ -1,6 +1,6 @@
-import { readUsdcBalance } from '@/lib/chain'
 import {
   createUserWallet,
+  readWalletUsdcBalance,
   transferUsdcFromTreasury,
   waitForUsdcBalance,
 } from '@/lib/circle'
@@ -35,7 +35,10 @@ export async function createOrGetWalletForEmail(
       raw: BigInt(stored.balanceRaw ?? '0'),
     }
     try {
-      balance = await readUsdcBalance(stored.address)
+      balance = await readWalletUsdcBalance({
+        walletId: stored.walletId,
+        address: stored.address,
+      })
     } catch (err) {
       console.warn('[wallet/login] could not refresh stored wallet balance', {
         email,
@@ -82,8 +85,8 @@ export async function createOrGetWalletForEmail(
   }
 
   const balance = transactionId
-    ? await waitForUsdcBalance(address)
-    : { formatted: '0', raw: 0n }
+    ? await waitForUsdcBalance(address, { walletId })
+    : { formatted: '0', raw: 0n, source: 'circle-wallets' as const }
 
   const saved = await upsertUserWallet({
     email,

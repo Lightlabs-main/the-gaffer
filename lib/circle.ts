@@ -4,8 +4,8 @@
  * createUserWallet:   creates one EVM wallet on Arc Testnet and returns its
  *                     real Circle walletId + on-chain address.
  * fundWalletUSDC:     requests test USDC from Circle's Arc Testnet faucet.
- * waitForUsdcBalance: polls the chain (not Circle's API) until the wallet has
- *                     a positive USDC balance, or the timeout elapses.
+ * waitForUsdcBalance: polls Arc, with Circle's indexed wallet balance as a
+ *                     fallback when the public RPC is throttled.
  */
 import {
   initiateDeveloperControlledWalletsClient,
@@ -17,11 +17,12 @@ import {
 // bundle (`TestnetBlockchain` is types-only at the moment). Using the literal
 // strings directly is safer and structurally type-equivalent.
 export const ARC_TESTNET = 'ARC-TESTNET' as const
-import type { Address } from 'viem'
+import { formatUnits, parseUnits, type Address } from 'viem'
 import { env } from './env'
 import { readUsdcBalance, ARC_TESTNET_USDC_ADDRESS } from './chain'
 
 let _client: CircleDeveloperControlledWalletsClient | null = null
+let arcRpcUnavailableUntil = 0
 
 export function getCircleClient(): CircleDeveloperControlledWalletsClient {
   if (_client) return _client
@@ -35,6 +36,81 @@ export function getCircleClient(): CircleDeveloperControlledWalletsClient {
 export interface CreatedWallet {
   walletId: string
   address: Address
+}
+
+export interface WalletUsdcBalance {
+  raw: bigint
+  formatted: string
+  source: 'arc-rpc' | 'circle-wallets'
+}
+
+function isArcRpcThrottle(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return /request limit|rate.?limit|too many requests|\b429\b/i.test(message)
+}
+
+async function readCircleWalletUsdcBalance(
+  walletId: string,
+): Promise<WalletUsdcBalance> {
+  const response = await getCircleClient().getWalletTokenBalance({
+    id: walletId,
+    tokenAddresses: [ARC_TESTNET_USDC_ADDRESS],
+  })
+  const balances = response.data?.tokenBalances ?? []
+  const usdc = balances.find((balance) => {
+    const tokenAddress = balance.token.tokenAddress?.toLowerCase()
+    return (
+      tokenAddress === ARC_TESTNET_USDC_ADDRESS.toLowerCase() ||
+      (balance.token.blockchain === ARC_TESTNET &&
+        balance.token.symbol?.toUpperCase() === 'USDC')
+    )
+  })
+  const raw = parseUnits(usdc?.amount ?? '0', 6)
+  return {
+    raw,
+    formatted: formatUnits(raw, 6),
+    source: 'circle-wallets',
+  }
+}
+
+/**
+ * Reads a Circle-managed Arc wallet's USDC balance. Direct RPC remains the
+ * primary proof source, but a short circuit breaker prevents a shared public
+ * RPC quota outage from disabling every user. Circle's indexed wallet balance
+ * is still derived from the same Arc wallet and is used only as the fallback.
+ */
+export async function readWalletUsdcBalance(opts: {
+  walletId: string
+  address: Address
+}): Promise<WalletUsdcBalance> {
+  let rpcError: unknown
+  if (Date.now() >= arcRpcUnavailableUntil) {
+    try {
+      const balance = await readUsdcBalance(opts.address)
+      return { ...balance, source: 'arc-rpc' }
+    } catch (error) {
+      rpcError = error
+      if (isArcRpcThrottle(error)) {
+        arcRpcUnavailableUntil = Date.now() + 60_000
+      }
+      console.warn('[wallet/balance] Arc RPC read failed; using Circle index', {
+        address: opts.address,
+        message: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  try {
+    return await readCircleWalletUsdcBalance(opts.walletId)
+  } catch (circleError) {
+    const rpcMessage =
+      rpcError instanceof Error ? rpcError.message : String(rpcError ?? '')
+    const circleMessage =
+      circleError instanceof Error ? circleError.message : String(circleError)
+    throw new Error(
+      `Wallet balance verification failed. Arc RPC: ${rpcMessage || 'temporarily throttled'}. Circle: ${circleMessage}`,
+    )
+  }
 }
 
 /**
@@ -155,15 +231,26 @@ export async function transferUsdcFromWallet(opts: {
  */
 export async function waitForUsdcBalance(
   address: Address,
-  opts: { timeoutMs?: number; intervalMs?: number } = {},
-): Promise<{ raw: bigint; formatted: string }> {
+  opts: {
+    walletId?: string
+    timeoutMs?: number
+    intervalMs?: number
+  } = {},
+): Promise<WalletUsdcBalance> {
   const timeoutMs = opts.timeoutMs ?? 90_000
   const intervalMs = opts.intervalMs ?? 3_000
   const start = Date.now()
   while (Date.now() - start < timeoutMs) {
-    const bal = await readUsdcBalance(address)
+    const bal = opts.walletId
+      ? await readWalletUsdcBalance({ walletId: opts.walletId, address })
+      : { ...(await readUsdcBalance(address)), source: 'arc-rpc' as const }
     if (bal.raw > 0n) return bal
     await new Promise((r) => setTimeout(r, intervalMs))
   }
-  return readUsdcBalance(address)
+  return opts.walletId
+    ? readWalletUsdcBalance({ walletId: opts.walletId, address })
+    : readUsdcBalance(address).then((balance) => ({
+        ...balance,
+        source: 'arc-rpc' as const,
+      }))
 }
